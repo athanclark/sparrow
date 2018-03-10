@@ -22,9 +22,15 @@ description:         Please see the README on Github at <https://git.localcookin
 dependencies:
 - base >= 4.7 && < 5
 - aeson
+- http-types
 - mtl
+- nested-routes >= 8.0.2
 - pred-trie
 - text
+- uuid
+- wai-middleware-content-type
+- wai-transformers
+- websockets-simple >= 0.1.0
 
 library:
   source-dirs: src

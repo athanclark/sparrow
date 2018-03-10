@@ -25,7 +25,7 @@ data ServerReturn m initIn initOut deltaIn = ServerReturn
   }
 
 newtype Server m initIn initOut deltaIn deltaOut = Server
-  { getServer :: ServerArgs m deltaOut -> m (ServerReturn m initIn initOut deltaIn)
+  { getServer :: ServerArgs m deltaOut -> ServerReturn m initIn initOut deltaIn
   }
 
 

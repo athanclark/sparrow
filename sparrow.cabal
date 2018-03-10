@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 19914a33e41a5731b3b751ad036a7712f1e59242b1a917a4f3dca0925daf756a
+-- hash: f775717cba0ff6449746e5ec5e232549306f40b15af8ad025dfce2c93275e1b4
 
 name:           sparrow
 version:        0.0.0
@@ -27,7 +27,9 @@ library
   exposed-modules:
       Web.Dependencies.Sparrow
       Web.Dependencies.Sparrow.Server
+      Web.Dependencies.Sparrow.Server.Subs
       Web.Dependencies.Sparrow.Server.Types
+      Web.Dependencies.Sparrow.Session
       Web.Dependencies.Sparrow.Types
   other-modules:
       Paths_sparrow
@@ -36,9 +38,15 @@ library
   build-depends:
       aeson
     , base >=4.7 && <5
+    , http-types
     , mtl
+    , nested-routes >=8.0.2
     , pred-trie
     , text
+    , uuid
+    , wai-middleware-content-type
+    , wai-transformers
+    , websockets-simple >=0.1.0
   default-language: Haskell2010
 
 test-suite sparrow-test
@@ -52,8 +60,14 @@ test-suite sparrow-test
   build-depends:
       aeson
     , base >=4.7 && <5
+    , http-types
     , mtl
+    , nested-routes >=8.0.2
     , pred-trie
     , sparrow
     , text
+    , uuid
+    , wai-middleware-content-type
+    , wai-transformers
+    , websockets-simple >=0.1.0
   default-language: Haskell2010

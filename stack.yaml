@@ -38,7 +38,11 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
-# extra-deps: []
+extra-deps:
+  - nested-routes-8.0.2
+  - wai-middleware-content-type-0.5.2
+  - wai-middleware-verbs-0.3.2
+  - websockets-simple-0.1.0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

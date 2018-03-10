@@ -2,6 +2,7 @@ module Web.Dependencies.Sparrow.Server.Types
   ( Tries (..)
   , SparrowServerT
   , execSparrowServerT
+  , tell'
   ) where
 
 import Data.Text (Text)
