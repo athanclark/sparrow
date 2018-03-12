@@ -16,8 +16,14 @@ module Web.Dependencies.Sparrow.Server.Types
   , ask'
   , unsafeBroadcastTopic
   , unsafeSendTo
+  , unsafeRegisterReceive
   , registerOnUnsubscribe
+  , registerOnOpenThread
   , broadcaster
+  , getCurrentRegisteredTopics
+  , getCallReceive
+  , killOnOpenThread
+  , callOnUnsubscribe
   ) where
 
 import Web.Dependencies.Sparrow.Types (Topic (..), Broadcast)
@@ -54,6 +60,7 @@ unsafeSendTo Env{envSessionsOutgoing} sID v =
 
 type RegisteredReceive m = STMMap.Map SessionID (STMMap.Map Topic (Value -> Maybe (m ())))
 
+-- unsafe because receiver isn't type-caste to the expected Topic
 unsafeRegisterReceive :: MonadIO m
                       => Env m -> SessionID -> Topic -> (Value -> Maybe (m ())) -> STM ()
 unsafeRegisterReceive Env{envRegisteredReceive} sID topic f = do
@@ -77,6 +84,13 @@ getCallReceive Env{envRegisteredReceive} sID topic v = do
       case mOnReceive of
         Nothing -> pure Nothing
         Just onReceive -> pure (onReceive v)
+
+getCurrentRegisteredTopics :: Env m -> SessionID -> STM [Topic]
+getCurrentRegisteredTopics Env{envRegisteredReceive} sID = do
+  mTopics <- STMMap.lookup sID envRegisteredReceive
+  case mTopics of
+    Nothing -> pure []
+    Just ts -> fmap fst <$> ListT.toReverseList (STMMap.stream ts)
 
 type RegisteredTopicInvalidators = STMMap.Map Topic (Value -> Maybe String)
 
@@ -165,35 +179,33 @@ registerOnOpenThread Env{envRegisteredOnOpenThreads} sID topic thread = do
     Just x -> pure x
   STMMap.insert thread topic topics
 
-killOnOpenThread :: MonadIO m => Env m -> SessionID -> Topic -> m ()
-killOnOpenThread Env{envRegisteredOnOpenThreads} sID topic =
-  liftIO $ do
-    mThread <- atomically $ do
-      mTopics <- STMMap.lookup sID envRegisteredOnOpenThreads
-      case mTopics of
-        Nothing -> pure Nothing
-        Just topics -> do
-          x <- STMMap.lookup topic topics
-          STMMap.delete topic topics
-          pure x
-    case mThread of
-      Nothing -> pure ()
-      Just thread -> cancel thread
+killOnOpenThread :: MonadIO m => Env m -> SessionID -> Topic -> IO ()
+killOnOpenThread Env{envRegisteredOnOpenThreads} sID topic = do
+  mThread <- atomically $ do
+    mTopics <- STMMap.lookup sID envRegisteredOnOpenThreads
+    case mTopics of
+      Nothing -> pure Nothing
+      Just topics -> do
+        x <- STMMap.lookup topic topics
+        STMMap.delete topic topics
+        pure x
+  case mThread of
+    Nothing -> pure ()
+    Just thread -> cancel thread
 
 
-killAllOnOpenThreads :: MonadIO m => Env m -> SessionID -> m ()
-killAllOnOpenThreads Env{envRegisteredOnOpenThreads} sID =
-  liftIO $ do
-    threads <- atomically $ do
-      mTopics <- STMMap.lookup sID envRegisteredOnOpenThreads
-      STMMap.delete sID envRegisteredOnOpenThreads
-      case mTopics of
-        Nothing -> pure []
-        Just topics -> do
-          x <- fmap snd <$> ListT.toReverseList (STMMap.stream topics)
-          STMMap.deleteAll topics
-          pure x
-    forM_ threads cancel
+killAllOnOpenThreads :: MonadIO m => Env m -> SessionID -> IO ()
+killAllOnOpenThreads Env{envRegisteredOnOpenThreads} sID = do
+  threads <- atomically $ do
+    mTopics <- STMMap.lookup sID envRegisteredOnOpenThreads
+    STMMap.delete sID envRegisteredOnOpenThreads
+    case mTopics of
+      Nothing -> pure []
+      Just topics -> do
+        x <- fmap snd <$> ListT.toReverseList (STMMap.stream topics)
+        STMMap.deleteAll topics
+        pure x
+  forM_ threads cancel
 
 
 data Env m = Env

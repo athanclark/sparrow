@@ -21,8 +21,14 @@ import Web.Dependencies.Sparrow.Server.Types
   , execSparrowServerT'
   , unsafeBroadcastTopic
   , unsafeSendTo
+  , unsafeRegisterReceive
   , registerOnUnsubscribe
+  , registerOnOpenThread
   , broadcaster
+  , getCurrentRegisteredTopics
+  , getCallReceive
+  , killOnOpenThread
+  , callOnUnsubscribe
   )
 
 import Web.Routes.Nested (Match, UrlChunks, RouterT (..), ExtrudeSoundly)
@@ -221,32 +227,18 @@ unpackServer topic server = do
                 -- register onOpen thread
                 case mThread of
                   Nothing -> pure ()
-                  Just thread -> do
-                    mThreads <- STMMap.lookup withSessionIDSessionID envRegisteredOnOpenThreads
-                    threads <- case mThreads of
-                      Nothing -> do
-                        x <- STMMap.new
-                        STMMap.insert x withSessionIDSessionID envRegisteredOnOpenThreads
-                        pure x
-                      Just x -> pure x
-                    STMMap.insert thread topic threads
+                  Just thread -> registerOnOpenThread env withSessionIDSessionID topic thread
 
                 -- register onReceive
                 -- TODO security policy for consuming sessionIDs, expiring & pending
                 -- check if currently "used", reject if topic is already subscribed
                 --   - can have pending sessionIDs... for a while
                 -- check if currently subscribed to that topic
-                mTopics <- STMMap.lookup withSessionIDSessionID envRegisteredReceive
-                topics <- case mTopics of
-                  Nothing -> do
-                    x <- STMMap.new
-                    STMMap.insert x withSessionIDSessionID envRegisteredReceive
-                    pure x
-                  Just x -> pure x
-                STMMap.insert (\v -> case Aeson.fromJSON v of
-                                  Aeson.Error _ -> Nothing
-                                  Aeson.Success (x :: deltaIn) -> Just (serverOnReceive serverArgs x)
-                              ) topic topics
+                unsafeRegisterReceive env withSessionIDSessionID topic
+                  (\v -> case Aeson.fromJSON v of
+                      Aeson.Error _ -> Nothing
+                      Aeson.Success (x :: deltaIn) -> Just (serverOnReceive serverArgs x)
+                  )
 
               (NR.action $ NR.post $ NR.json serverInitOut) app req resp
 
@@ -287,7 +279,7 @@ dependencies :: forall m sec a
              -> RouterT (MiddlewareT m) sec m ()
 dependencies runM server = do
   ( httpTrie
-    , Env
+    , env@Env
       { envSessionsOutgoing
       , envRegisteredReceive
       , envRegisteredTopicInvalidators
@@ -308,6 +300,7 @@ dependencies runM server = do
       Just sID -> do
         let sessionID = SessionID sID
 
+        -- For listening on the outgoing TMapChan envSessionsOutgoing
         (outgoingListener :: TMVar (Async ())) <- liftIO newEmptyTMVarIO
 
         let wsApp :: WebSocketsApp m (WSIncoming (WithTopic Value)) (WSOutgoing Value)
@@ -319,37 +312,15 @@ dependencies runM server = do
                       runM (send (WSOutgoing x))
                     atomically (putTMVar outgoingListener listener)
 
-                  initSubs <- liftIO $ atomically $ do
-                    mTopics <- STMMap.lookup sessionID envRegisteredReceive
-                    case mTopics of
-                      Nothing -> pure [] -- FIXME should never happen - throw error?
-                      Just ts -> fmap fst <$> ListT.toReverseList (STMMap.stream ts)
+                  initSubs <- liftIO $ atomically $ getCurrentRegisteredTopics env sessionID
 
                   send (WSTopicsSubscribed initSubs)
 
               , onReceive = \WebSocketsAppParams{send,close} r -> case r of
                   WSUnsubscribe topic -> do
-                    -- kill async thread created onOpen
-                    liftIO $ do
-                      mThread <- atomically $ do
-                        mThreads <- STMMap.lookup sessionID envRegisteredOnOpenThreads
-                        case mThreads of
-                          Nothing -> pure Nothing
-                          Just threads -> STMMap.lookup topic threads
-                      case mThread of
-                        Nothing -> pure ()
-                        Just thread -> cancel thread
+                    liftIO $ killOnOpenThread env sessionID topic
 
-                    -- facilitate onUnsubscribe handler
-                    eff <- liftIO $ atomically $ do
-                      mTopics <- STMMap.lookup sessionID envRegisteredOnUnsubscribe
-                      case mTopics of
-                        Nothing -> pure (pure ())
-                        Just topics -> do
-                          mEff <- STMMap.lookup topic topics
-                          STMMap.delete topic topics
-                          pure (fromMaybe (pure ()) mEff)
-                    eff
+                    callOnUnsubscribe env sessionID topic
                     -- TODO
                     --  - clean-up registered topic mappings for sessionID
 
@@ -357,15 +328,7 @@ dependencies runM server = do
                     send (WSTopicsRemoved [topic])
 
                   WSIncoming (WithTopic t@(Topic topic) x) -> do
-                    mEff <- liftIO $ atomically $ do
-                      mTopics <- STMMap.lookup sessionID envRegisteredReceive
-                      case mTopics of
-                        Nothing -> pure Nothing
-                        Just topics -> do
-                          mReceiver <- STMMap.lookup t topics
-                          case mReceiver of
-                            Nothing -> pure Nothing
-                            Just receiver -> pure (receiver x)
+                    mEff <- liftIO $ atomically $ getCallReceive env sessionID t x
 
                     case mEff of
                       Nothing -> pure () -- TODO Fail
