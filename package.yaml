@@ -22,14 +22,28 @@ description:         Please see the README on Github at <https://git.localcookin
 dependencies:
 - base >= 4.7 && < 5
 - aeson
+- aeson-attoparsec
+- async
+- attoparsec
+- bytestring
+- exceptions
+- extractable-singleton
+- hashable
 - http-types
+- list-t
+- monad-control
+- monad-control-aligned
 - mtl
-- nested-routes >= 8.0.2
+- nested-routes >= 8.1.0
 - pred-trie
+- stm
+- stm-containers >= 0.2.16
 - text
+- tmapchan
 - uuid
 - wai-middleware-content-type
 - wai-transformers
+- websockets >= 0.12.3.1
 - websockets-simple >= 0.1.0
 
 library:

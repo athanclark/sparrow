@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f775717cba0ff6449746e5ec5e232549306f40b15af8ad025dfce2c93275e1b4
+-- hash: 11da78474830dfa787d60ab2ae0398732fb513b7c9ffe69438ccf5c070990094
 
 name:           sparrow
 version:        0.0.0
@@ -37,15 +37,29 @@ library
       src
   build-depends:
       aeson
+    , aeson-attoparsec
+    , async
+    , attoparsec
     , base >=4.7 && <5
+    , bytestring
+    , exceptions
+    , extractable-singleton
+    , hashable
     , http-types
+    , list-t
+    , monad-control
+    , monad-control-aligned
     , mtl
-    , nested-routes >=8.0.2
+    , nested-routes >=8.1.0
     , pred-trie
+    , stm
+    , stm-containers >=0.2.16
     , text
+    , tmapchan
     , uuid
     , wai-middleware-content-type
     , wai-transformers
+    , websockets >=0.12.3.1
     , websockets-simple >=0.1.0
   default-language: Haskell2010
 
@@ -59,15 +73,29 @@ test-suite sparrow-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
+    , aeson-attoparsec
+    , async
+    , attoparsec
     , base >=4.7 && <5
+    , bytestring
+    , exceptions
+    , extractable-singleton
+    , hashable
     , http-types
+    , list-t
+    , monad-control
+    , monad-control-aligned
     , mtl
-    , nested-routes >=8.0.2
+    , nested-routes >=8.1.0
     , pred-trie
     , sparrow
+    , stm
+    , stm-containers >=0.2.16
     , text
+    , tmapchan
     , uuid
     , wai-middleware-content-type
     , wai-transformers
+    , websockets >=0.12.3.1
     , websockets-simple >=0.1.0
   default-language: Haskell2010
