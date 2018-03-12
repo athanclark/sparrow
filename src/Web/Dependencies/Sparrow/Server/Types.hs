@@ -15,9 +15,12 @@ module Web.Dependencies.Sparrow.Server.Types
   , tell'
   , ask'
   , unsafeBroadcastTopic
+  , unsafeSendTo
+  , registerOnUnsubscribe
+  , broadcaster
   ) where
 
-import Web.Dependencies.Sparrow.Types (Topic (..))
+import Web.Dependencies.Sparrow.Types (Topic (..), Broadcast)
 import Web.Dependencies.Sparrow.Session (SessionID)
 
 import Data.Text (Text)
@@ -86,12 +89,9 @@ registerInvalidator Env{envRegisteredTopicInvalidators} topic Proxy =
                     Aeson.Success (x :: deltaIn) -> Nothing
                 ) topic envRegisteredTopicInvalidators
 
-validate :: Env m -> Topic -> Value -> STM (Maybe (Maybe String))
-validate Env{envRegisteredTopicInvalidators} topic v = do
-  mInvalidator <- STMMap.lookup topic envRegisteredTopicInvalidators
-  case mInvalidator of
-    Nothing -> pure Nothing
-    Just invalidator -> pure (Just (invalidator v))
+getValidator :: Env m -> Topic -> STM (Maybe (Value -> Maybe String))
+getValidator Env{envRegisteredTopicInvalidators} topic =
+  STMMap.lookup topic envRegisteredTopicInvalidators
 
 type RegisteredTopicSubscribers = STMMultimap.Multimap Topic SessionID
 
@@ -211,6 +211,16 @@ unsafeBroadcastTopic (Env sessions _ _ subs _ _) t v =
   liftIO $ atomically $ do
     ss <- ListT.toReverseList (STMMultimap.streamByKey t subs)
     forM_ ss (\sessionID -> TMapChan.insert sessions sessionID v)
+
+
+broadcaster :: MonadIO m => Env m -> Broadcast m
+broadcaster env = \topic -> do
+  mInvalidator <- liftIO $ atomically $ getValidator env topic
+  case mInvalidator of
+    Nothing -> pure Nothing
+    Just invalidator -> pure $ Just $ \v -> case invalidator v of
+      Just _ -> Nothing -- is invalid
+      Nothing -> Just (unsafeBroadcastTopic env topic v)
 
 
 -- | Monoid for WriterT (as StateT)

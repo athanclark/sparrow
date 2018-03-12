@@ -12,7 +12,18 @@ module Web.Dependencies.Sparrow.Server where
 
 import Web.Dependencies.Sparrow.Types (Server, ServerArgs (..), ServerReturn (..), ServerContinue (..), Topic (..))
 import Web.Dependencies.Sparrow.Session (SessionID (..))
-import Web.Dependencies.Sparrow.Server.Types (SparrowServerT, Env (..), tell', execSparrowServerT, execSparrowServerT', ask', unsafeBroadcastTopic)
+import Web.Dependencies.Sparrow.Server.Types
+  ( SparrowServerT
+  , Env (..)
+  , ask'
+  , tell'
+  , execSparrowServerT
+  , execSparrowServerT'
+  , unsafeBroadcastTopic
+  , unsafeSendTo
+  , registerOnUnsubscribe
+  , broadcaster
+  )
 
 import Web.Routes.Nested (Match, UrlChunks, RouterT (..), ExtrudeSoundly)
 import qualified Web.Routes.Nested as NR
@@ -179,18 +190,10 @@ unpackServer topic server = do
             Just ServerContinue{serverContinue,serverOnUnsubscribe} -> do
 
               liftIO $ atomically $ do
-                -- register onUnsubscribe for sessionID :-> topic
-                mTopics <- STMMap.lookup withSessionIDSessionID envRegisteredOnUnsubscribe
-                topics <- case mTopics of
-                  Nothing -> do
-                    x <- STMMap.new
-                    STMMap.insert x withSessionIDSessionID envRegisteredOnUnsubscribe
-                    pure x
-                  Just x -> pure x
-                STMMap.insert serverOnUnsubscribe topic topics
+                registerOnUnsubscribe env withSessionIDSessionID topic serverOnUnsubscribe
 
                 -- notify client of added subscription
-                TMapChan.insert envSessionsOutgoing withSessionIDSessionID $
+                unsafeSendTo env withSessionIDSessionID $ 
                   toJSON (WSTopicsAdded [topic] :: WSOutgoing ())
 
               let serverArgs :: ServerArgs m deltaOut
@@ -203,22 +206,14 @@ unpackServer topic server = do
                       --  - invoke onUnsubscribe...?
                       pure ()
                     , serverSendCurrent =
-                      liftIO . atomically . TMapChan.insert envSessionsOutgoing withSessionIDSessionID . toJSON
+                      liftIO . atomically . unsafeSendTo env withSessionIDSessionID . toJSON
                     }
 
               ServerReturn
                 { serverInitOut
                 , serverOnOpen
                 , serverOnReceive
-                } <- serverContinue $
-                -- Broadcasting facility
-                \topic' -> do
-                  mInvalidator <- liftIO $ atomically $ STMMap.lookup topic' envRegisteredTopicInvalidators
-                  case mInvalidator of
-                    Nothing -> pure Nothing
-                    Just invalidator -> pure $ Just $ \v -> case invalidator v of
-                      Just _ -> Nothing -- is invalid
-                      Nothing -> Just (unsafeBroadcastTopic env topic' v)
+                } <- serverContinue (broadcaster env)
 
               mThread <- serverOnOpen serverArgs
 
