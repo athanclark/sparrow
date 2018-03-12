@@ -6,6 +6,8 @@ author:              "Athan Clark"
 maintainer:          "athan.clark@localcooking.com"
 copyright:           "2018 Local Cooking Inc."
 
+ghc-options: -Wall
+
 extra-source-files:
 - README.md
 - ChangeLog.md
@@ -56,6 +58,7 @@ tests:
     ghc-options:
     - -threaded
     - -rtsopts
+    - -Wall
     - -with-rtsopts=-N
     dependencies:
     - sparrow

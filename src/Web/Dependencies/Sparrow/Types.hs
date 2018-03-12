@@ -12,6 +12,7 @@ import Data.Aeson (ToJSON (..), FromJSON (..), Value (String))
 import Data.Aeson.Attoparsec (attoAeson)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
 import GHC.Generics (Generic)
+import Control.Concurrent.Async (Async)
 
 
 -- * Server
@@ -23,8 +24,13 @@ data ServerArgs m deltaOut = ServerArgs
 
 data ServerReturn m initOut deltaIn deltaOut = ServerReturn
   { serverInitOut   :: initOut
-  , serverOnOpen    :: ServerArgs m deltaOut -> m () -- only after initOut is provided, can we send deltas - invoked once
-  , serverOnReceive :: ServerArgs m deltaOut -> deltaIn -> m () -- invoked for each receive
+  , serverOnOpen    :: ServerArgs m deltaOut
+                    -> m (Maybe (Async ()))
+    -- ^ only after initOut is provided can we send deltas - invoked once, and should
+    -- return a totally 'Control.Concurrent.Async.link'ed thread (if spawned)
+    -- to kill with the subscription dies
+  , serverOnReceive :: ServerArgs m deltaOut
+                    -> deltaIn -> m () -- ^ invoked for each receive
   }
 
 data ServerContinue m initOut deltaIn deltaOut = ServerContinue
