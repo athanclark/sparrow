@@ -19,11 +19,18 @@ module Web.Dependencies.Sparrow.Server.Types
   , unsafeRegisterReceive
   , registerOnUnsubscribe
   , registerOnOpenThread
+  , registerInvalidator
   , broadcaster
   , getCurrentRegisteredTopics
   , getCallReceive
   , killOnOpenThread
+  , killAllOnOpenThreads
   , callOnUnsubscribe
+  , callAllOnUnsubscribe
+  , unregisterReceive
+  , addSubscriber
+  , delSubscriber
+  , delSubscriberFromAllTopics
   ) where
 
 import Web.Dependencies.Sparrow.Types (Topic (..), Broadcast)
@@ -72,6 +79,13 @@ unsafeRegisterReceive Env{envRegisteredReceive} sID topic f = do
       pure x
     Just x -> pure x
   STMMap.insert f topic topics
+
+unregisterReceive :: Env m -> SessionID -> Topic -> STM ()
+unregisterReceive Env{envRegisteredReceive} sID topic = do
+  mTopics <- STMMap.lookup sID envRegisteredReceive
+  case mTopics of
+    Nothing -> pure ()
+    Just topics -> STMMap.delete topic topics
 
 getCallReceive :: MonadIO m
                => Env m -> SessionID -> Topic -> Value -> STM (Maybe (m ()))
@@ -219,10 +233,10 @@ data Env m = Env
 
 
 unsafeBroadcastTopic :: MonadIO m => Env m -> Topic -> Value -> m ()
-unsafeBroadcastTopic (Env sessions _ _ subs _ _) t v =
+unsafeBroadcastTopic Env{envSessionsOutgoing,envRegisteredTopicSubscribers} t v =
   liftIO $ atomically $ do
-    ss <- ListT.toReverseList (STMMultimap.streamByKey t subs)
-    forM_ ss (\sessionID -> TMapChan.insert sessions sessionID v)
+    ss <- ListT.toReverseList (STMMultimap.streamByKey t envRegisteredTopicSubscribers)
+    forM_ ss (\sessionID -> TMapChan.insert envSessionsOutgoing sessionID v)
 
 
 broadcaster :: MonadIO m => Env m -> Broadcast m
