@@ -6,16 +6,24 @@
 
 module Web.Dependencies.Sparrow.Types where
 
+import Web.Dependencies.Sparrow.Session (SessionID)
+
 import Data.Hashable (Hashable)
 import Data.Text (Text, pack, intercalate)
-import Data.Aeson (ToJSON (..), FromJSON (..), Value (String))
+import qualified Data.Text.Lazy.Encoding as LT
+import qualified Data.ByteString.Lazy as LBS
+import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), (.=), object, (.:))
+import Data.Aeson.Types (typeMismatch)
 import Data.Aeson.Attoparsec (attoAeson)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
-import GHC.Generics (Generic)
+import Control.Applicative ((<|>))
 import Control.Concurrent.Async (Async)
+import GHC.Generics (Generic)
 
 
--- * Server
+-- * Conceptual
+
+-- ** Server
 
 data ServerArgs m deltaOut = ServerArgs
   { serverDeltaReject :: m ()
@@ -43,25 +51,25 @@ type Server m initIn initOut deltaIn deltaOut =
 
 
 
--- * Client
+-- ** Client
 
-data ClientReturn m deltaIn = ClientReturn
-  { clientSendCurrent   :: deltaIn -> m ()
-  , clientSendBroadcast :: Broadcast m
+data ClientReturn m initOut deltaIn = ClientReturn
+  { clientSendCurrent   :: deltaIn -> m Bool -- was vs. can't be successful?
+  , clientInitOut       :: initOut
   , clientUnsubscribe   :: m ()
   }
 
-data ClientArgs m initIn deltaIn deltaOut = ClientArgs
-  { clientReceive  :: ClientReturn m deltaIn -> deltaOut -> m ()
+data ClientArgs m initIn initOut deltaIn deltaOut = ClientArgs
+  { clientReceive  :: ClientReturn m initOut deltaIn -> deltaOut -> m ()
   , clientInitIn   :: initIn
   , clientOnReject :: m ()
   }
 
 type Client m initIn initOut deltaIn deltaOut =
-  (ClientArgs m initIn deltaIn deltaOut -> m (initOut, ClientReturn m deltaIn)) -> m ()
+  (ClientArgs m initIn initOut deltaIn deltaOut -> m (Maybe (ClientReturn m initOut deltaIn))) -> m ()
 
 
--- * Topic
+-- ** Topic
 
 newtype Topic = Topic {getTopic :: [Text]}
   deriving (Eq, Ord, Generic, Hashable, Show)
@@ -76,6 +84,81 @@ instance ToJSON Topic where
   toJSON (Topic xs) = String (intercalate "/" xs)
 
 
--- * Broadcast
+-- ** Broadcast
 
 type Broadcast m = Topic -> m (Maybe (Value -> Maybe (m ())))
+
+
+-- * JSON Encodings
+
+
+
+data WithSessionID a = WithSessionID
+  { withSessionIDSessionID :: SessionID
+  , withSessionIDContent   :: a
+  }
+
+instance FromJSON a => FromJSON (WithSessionID a) where
+  parseJSON (Object o) = WithSessionID <$> (o .: "sessionID") <*> (o .: "content")
+  parseJSON x = typeMismatch "WithSessionID" x
+
+data WithTopic a = WithTopic
+  { withTopicTopic   :: Topic
+  , withTopicContent :: a
+  }
+
+instance FromJSON a => FromJSON (WithTopic a) where
+  parseJSON (Object o) = WithTopic <$> (o .: "topic") <*> (o .: "content")
+  parseJSON x = typeMismatch "WithTopic" x
+
+
+data InitResponse a
+  = InitBadEncoding LBS.ByteString
+  | InitDecodingError String -- when manually decoding the content, casted
+  | InitRejected
+  | InitResponse a
+
+instance ToJSON a => ToJSON (InitResponse a) where
+  toJSON x = case x of
+    InitBadEncoding y -> object ["error" .= object ["badRequest" .= LT.decodeUtf8 y]]
+    InitDecodingError y -> object ["error" .= object ["decoding" .= y]]
+    InitRejected -> object ["error" .= String "rejected"]
+    InitResponse y -> object ["content" .= y]
+
+data WSHTTPResponse
+  = NoSessionID
+
+instance ToJSON WSHTTPResponse where
+  toJSON x = case x of
+    NoSessionID -> object ["error" .= String "no sessionID query parameter"]
+
+
+data WSIncoming a
+  = WSUnsubscribe
+    { wsUnsubscribeTopic :: Topic
+    }
+  | WSIncoming a
+
+instance FromJSON a => FromJSON (WSIncoming a) where
+  parseJSON (Object o) = do
+    let unsubscribe = WSUnsubscribe <$> o .: "unsubscribe"
+        incoming = WSIncoming <$> o .: "content"
+    unsubscribe <|> incoming
+  parseJSON x = typeMismatch "WSIncoming" x
+
+data WSOutgoing a
+  = WSTopicsSubscribed [Topic]
+  | WSTopicAdded Topic
+  | WSTopicRemoved Topic
+  | WSTopicRejected Topic
+  | WSDecodingError String
+  | WSOutgoing a
+
+instance ToJSON a => ToJSON (WSOutgoing a) where
+  toJSON x = case x of
+    WSDecodingError e -> object ["error" .= object ["decoding" .= e]]
+    WSTopicsSubscribed subs -> object ["subs" .= object ["init" .= subs]]
+    WSTopicAdded sub -> object ["subs" .= object ["add" .= sub]]
+    WSTopicRemoved sub -> object ["subs" .= object ["del" .= sub]]
+    WSTopicRejected sub -> object ["subs" .= object ["reject" .= sub]]
+    WSOutgoing y -> object ["content" .= y]

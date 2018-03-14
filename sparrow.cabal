@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 51e910e114debc3b6de517f49c9b881e7c0dcb19bcaf2d35668de584c9614e8e
+-- hash: 84ccb4527c51d58e8b937cdb075f8da21539327a1c354ac856677c1a01b42723
 
 name:           sparrow
 version:        0.0.0
@@ -26,6 +26,8 @@ source-repository head
 library
   exposed-modules:
       Web.Dependencies.Sparrow
+      Web.Dependencies.Sparrow.Client
+      Web.Dependencies.Sparrow.Client.Types
       Web.Dependencies.Sparrow.Server
       Web.Dependencies.Sparrow.Server.Subs
       Web.Dependencies.Sparrow.Server.Types
@@ -41,6 +43,7 @@ library
     , aeson-attoparsec
     , async
     , attoparsec
+    , attoparsec-uri >=0.0.4
     , base >=4.7 && <5
     , bytestring
     , exceptions
@@ -52,16 +55,21 @@ library
     , monad-control-aligned
     , mtl
     , nested-routes >=8.1.0
+    , path
+    , path-extra >=0.0.6
     , pred-trie
     , stm
     , stm-containers >=0.2.16
+    , strict
     , text
     , tmapchan
+    , urlpath >=8.0.1
     , uuid
     , wai-middleware-content-type
     , wai-transformers
     , websockets >=0.12.3.1
     , websockets-simple >=0.1.0
+    , wuss
   default-language: Haskell2010
 
 test-suite sparrow-test
@@ -77,6 +85,7 @@ test-suite sparrow-test
     , aeson-attoparsec
     , async
     , attoparsec
+    , attoparsec-uri >=0.0.4
     , base >=4.7 && <5
     , bytestring
     , exceptions
@@ -88,15 +97,20 @@ test-suite sparrow-test
     , monad-control-aligned
     , mtl
     , nested-routes >=8.1.0
+    , path
+    , path-extra >=0.0.6
     , pred-trie
     , sparrow
     , stm
     , stm-containers >=0.2.16
+    , strict
     , text
     , tmapchan
+    , urlpath >=8.0.1
     , uuid
     , wai-middleware-content-type
     , wai-transformers
     , websockets >=0.12.3.1
     , websockets-simple >=0.1.0
+    , wuss
   default-language: Haskell2010
