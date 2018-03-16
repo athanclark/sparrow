@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 84ccb4527c51d58e8b937cdb075f8da21539327a1c354ac856677c1a01b42723
+-- hash: 83719f4965bb45adb8b53974c8623ef330691ec871dbf4c2503787dea1565794
 
 name:           sparrow
 version:        0.0.0
@@ -16,7 +16,6 @@ build-type:     Simple
 cabal-version:  >= 1.10
 
 extra-source-files:
-    ChangeLog.md
     README.md
 
 source-repository head
@@ -29,7 +28,6 @@ library
       Web.Dependencies.Sparrow.Client
       Web.Dependencies.Sparrow.Client.Types
       Web.Dependencies.Sparrow.Server
-      Web.Dependencies.Sparrow.Server.Subs
       Web.Dependencies.Sparrow.Server.Types
       Web.Dependencies.Sparrow.Session
       Web.Dependencies.Sparrow.Types
@@ -49,23 +47,27 @@ library
     , exceptions
     , extractable-singleton
     , hashable
+    , http-client
+    , http-client-tls
     , http-types
     , list-t
     , monad-control
     , monad-control-aligned
     , mtl
-    , nested-routes >=8.1.0
+    , nested-routes >=8.2.0
     , path
     , path-extra >=0.0.6
     , pred-trie
     , stm
-    , stm-containers >=0.2.16
     , strict
     , text
     , tmapchan
+    , tmapmvar ==0.0.3
+    , transformers
+    , unordered-containers
     , urlpath >=8.0.1
     , uuid
-    , wai-middleware-content-type
+    , wai-middleware-content-type >=0.6.0
     , wai-transformers
     , websockets >=0.12.3.1
     , websockets-simple >=0.1.0
@@ -91,24 +93,28 @@ test-suite sparrow-test
     , exceptions
     , extractable-singleton
     , hashable
+    , http-client
+    , http-client-tls
     , http-types
     , list-t
     , monad-control
     , monad-control-aligned
     , mtl
-    , nested-routes >=8.1.0
+    , nested-routes >=8.2.0
     , path
     , path-extra >=0.0.6
     , pred-trie
     , sparrow
     , stm
-    , stm-containers >=0.2.16
     , strict
     , text
     , tmapchan
+    , tmapmvar ==0.0.3
+    , transformers
+    , unordered-containers
     , urlpath >=8.0.1
     , uuid
-    , wai-middleware-content-type
+    , wai-middleware-content-type >=0.6.0
     , wai-transformers
     , websockets >=0.12.3.1
     , websockets-simple >=0.1.0

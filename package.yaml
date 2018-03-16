@@ -10,7 +10,6 @@ ghc-options: -Wall
 
 extra-source-files:
 - README.md
-- ChangeLog.md
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -32,23 +31,27 @@ dependencies:
 - exceptions
 - extractable-singleton
 - hashable
+- http-client
+- http-client-tls
 - http-types
 - list-t
 - monad-control
 - monad-control-aligned
 - mtl
-- nested-routes >= 8.1.0
+- nested-routes >= 8.2.0
 - path
 - path-extra >= 0.0.6
 - pred-trie
 - stm
-- stm-containers >= 0.2.16
 - strict
 - text
 - tmapchan
+- tmapmvar == 0.0.3
+- transformers
+- unordered-containers
 - urlpath >= 8.0.1
 - uuid
-- wai-middleware-content-type
+- wai-middleware-content-type >= 0.6.0
 - wai-transformers
 - websockets >= 0.12.3.1
 - websockets-simple >= 0.1.0

@@ -1,0 +1,64 @@
+name:                example
+version:             0.1.0.0
+github:              "githubuser/example"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2018 Author name here"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/githubuser/example#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- aeson
+
+library:
+  source-dirs: src
+
+executables:
+  example-server:
+    main:                Main.hs
+    source-dirs:         server
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - example
+    - sparrow
+    - exceptions
+    - extractable-singleton
+    - http-types
+    - monad-control
+    - monad-control-aligned
+    - mtl
+    - nested-routes >= 8.2.0
+    - wai-transformers
+    - wai-middleware-content-type
+    - wai
+    - warp
+
+  example-client:
+    main:                Main.hs
+    source-dirs:         client
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - example
+    - sparrow
+    - attoparsec-uri
+    - path
+    - strict
