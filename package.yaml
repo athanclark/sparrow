@@ -5,6 +5,8 @@ license:             BSD3
 author:              "Athan Clark"
 maintainer:          "athan.clark@localcooking.com"
 copyright:           "2018 Local Cooking Inc."
+category:            Web
+synopsis:            Unified streaming dependency management for web apps
 
 ghc-options: -Wall
 
