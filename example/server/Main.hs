@@ -30,21 +30,21 @@ import qualified Control.Monad.Trans.Control.Aligned as Aligned
 server :: MonadIO m
        => Server m InitIn InitOut DeltaIn DeltaOut
 server InitIn = do
-  liftIO $ print InitIn
+  liftIO $ putStrLn "  ## Init"
   pure $ Just ServerContinue
     { serverContinue = \broadcast -> do
-        liftIO $ putStrLn "Returning..."
+        liftIO $ putStrLn "  ## Returning"
         pure ServerReturn
           { serverInitOut = InitOut
           , serverOnOpen = \ServerArgs{serverDeltaReject,serverSendCurrent} -> do
-              liftIO $ putStrLn "Sending DeltaOut onOpen..."
+              liftIO $ putStrLn "  ## Sending DeltaOut onOpen"
               serverSendCurrent DeltaOut
           , serverOnReceive = \ServerArgs{serverDeltaReject,serverSendCurrent} DeltaIn -> do
-              liftIO $ putStrLn "Received DeltaIn..."
+              liftIO $ putStrLn "  ## Received DeltaIn and Rejecting"
               serverDeltaReject
           }
     , serverOnUnsubscribe = do
-        liftIO $ putStrLn "Unsubscribed..."
+        liftIO $ putStrLn "  ## Unsubscribed"
     }
 
 
@@ -54,14 +54,14 @@ routes :: Aligned.MonadBaseControl IO m stM
        => MonadCatch m
        => MonadIO m
        => RouterT (MiddlewareT m) sec m ()
-routes = do
-  dependencies <- lift $ serveDependencies $ do
-    fooServer <- unpackServer (Topic ["foo"]) server
-    match (l_ "foo" </> o_) fooServer
-  dependencies
+routes = pure ()
 
 
 main :: IO ()
-main = run 3000 (route routes defApp)
+main = do
+  dependencies <- serveDependencies $ do
+    fooServer <- unpackServer (Topic ["foo"]) server
+    match (l_ "foo" </> o_) fooServer
+  run 3000 (route dependencies defApp)
   where
     defApp req resp = resp (textOnly "404" status404 [])

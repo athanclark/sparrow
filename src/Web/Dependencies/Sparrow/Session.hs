@@ -1,5 +1,6 @@
 {-# LANGUAGE
     GeneralizedNewtypeDeriving
+  , DeriveGeneric
   #-}
 
 module Web.Dependencies.Sparrow.Session where
@@ -9,10 +10,12 @@ import Data.Text (unpack)
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String))
 import Data.Aeson.Types (typeMismatch)
 import Data.Hashable (Hashable)
+import Control.DeepSeq (NFData)
+import GHC.Generics (Generic)
 
 
 newtype SessionID = SessionID {getSessionID :: UUID}
-  deriving (Eq, Hashable)
+  deriving (Eq, Hashable, Generic, NFData)
 
 instance Show SessionID where
   show (SessionID x) = toString x

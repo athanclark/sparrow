@@ -17,6 +17,7 @@ import Data.URI.Auth (URIAuth (..))
 import Data.URI.Auth.Host (URIAuthHost (Localhost))
 import qualified Data.Strict.Maybe as Strict
 import Control.Monad.IO.Class (MonadIO (..))
+import Control.Concurrent (threadDelay)
 import Path (absdir)
 
 
@@ -41,5 +42,6 @@ client call = do
 
 main :: IO ()
 main = do
-  allocateDependencies False (URIAuth Strict.Nothing Localhost (Strict.Just 3000)) [absdir|/dependencies/|] $ do
+  allocateDependencies False (URIAuth Strict.Nothing Localhost (Strict.Just 3000)) $ do
+    liftIO (threadDelay (10^6))
     unpackClient (Topic ["foo"]) client

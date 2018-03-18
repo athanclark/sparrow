@@ -18,6 +18,7 @@ import Data.Aeson.Types (typeMismatch)
 import Data.Aeson.Attoparsec (attoAeson)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
 import Control.Applicative ((<|>))
+import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 
 
@@ -74,7 +75,7 @@ type Client m initIn initOut deltaIn deltaOut =
 -- ** Topic
 
 newtype Topic = Topic {getTopic :: [Text]}
-  deriving (Eq, Ord, Generic, Hashable, Show)
+  deriving (Eq, Ord, Generic, Hashable, Show, NFData)
 
 instance FromJSON Topic where
   parseJSON = attoAeson (Topic <$> breaker)
@@ -98,7 +99,9 @@ type Broadcast m = Topic -> m (Maybe (Value -> Maybe (m ())))
 data WithSessionID a = WithSessionID
   { withSessionIDSessionID :: {-# UNPACK #-} !SessionID
   , withSessionIDContent   :: a
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WithSessionID a)
 
 instance ToJSON a => ToJSON (WithSessionID a) where
   toJSON WithSessionID{..} = object
@@ -113,7 +116,9 @@ instance FromJSON a => FromJSON (WithSessionID a) where
 data WithTopic a = WithTopic
   { withTopicTopic   :: !Topic
   , withTopicContent :: a
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WithTopic a)
 
 instance ToJSON a => ToJSON (WithTopic a) where
   toJSON WithTopic{..} = object
@@ -131,7 +136,9 @@ data InitResponse a
   | InitDecodingError !String -- when manually decoding the content, casted
   | InitRejected
   | InitResponse a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (InitResponse a)
 
 instance ToJSON a => ToJSON (InitResponse a) where
   toJSON x = case x of
@@ -163,6 +170,9 @@ instance FromJSON a => FromJSON (InitResponse a) where
 
 data WSHTTPResponse
   = NoSessionID
+  deriving (Eq, Show, Generic)
+
+instance NFData WSHTTPResponse
 
 instance ToJSON WSHTTPResponse where
   toJSON x = case x of
@@ -187,7 +197,9 @@ data WSIncoming a
     { wsUnsubscribeTopic :: !Topic
     }
   | WSIncoming a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WSIncoming a)
 
 instance ToJSON a => ToJSON (WSIncoming a) where
   toJSON x = case x of
@@ -208,7 +220,9 @@ data WSOutgoing a
   | WSTopicRejected !Topic
   | WSDecodingError !String
   | WSOutgoing a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WSOutgoing a)
 
 instance ToJSON a => ToJSON (WSOutgoing a) where
   toJSON x = case x of

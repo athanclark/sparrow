@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 83719f4965bb45adb8b53974c8623ef330691ec871dbf4c2503787dea1565794
+-- hash: f9e9b39ec7248eee4c6dd88282455763c434ce2906b3ae1e91026cb58753350f
 
 name:           sparrow
 version:        0.0.0
@@ -44,6 +44,7 @@ library
     , attoparsec-uri >=0.0.4
     , base >=4.7 && <5
     , bytestring
+    , deepseq
     , exceptions
     , extractable-singleton
     , hashable
@@ -54,15 +55,15 @@ library
     , monad-control
     , monad-control-aligned
     , mtl
-    , nested-routes >=8.2.0
+    , nested-routes >=9.0.0
     , path
     , path-extra >=0.0.6
-    , pred-trie
+    , pred-trie >=0.6.0.1
     , stm
     , strict
     , text
     , tmapchan
-    , tmapmvar ==0.0.3
+    , tmapmvar >=0.0.4
     , transformers
     , unordered-containers
     , urlpath >=8.0.1
@@ -70,7 +71,7 @@ library
     , wai-middleware-content-type >=0.6.0
     , wai-transformers
     , websockets >=0.12.3.1
-    , websockets-simple >=0.1.0
+    , websockets-simple >=0.1.1
     , wuss
   default-language: Haskell2010
 
@@ -90,6 +91,7 @@ test-suite sparrow-test
     , attoparsec-uri >=0.0.4
     , base >=4.7 && <5
     , bytestring
+    , deepseq
     , exceptions
     , extractable-singleton
     , hashable
@@ -100,16 +102,16 @@ test-suite sparrow-test
     , monad-control
     , monad-control-aligned
     , mtl
-    , nested-routes >=8.2.0
+    , nested-routes >=9.0.0
     , path
     , path-extra >=0.0.6
-    , pred-trie
+    , pred-trie >=0.6.0.1
     , sparrow
     , stm
     , strict
     , text
     , tmapchan
-    , tmapmvar ==0.0.3
+    , tmapmvar >=0.0.4
     , transformers
     , unordered-containers
     , urlpath >=8.0.1
@@ -117,6 +119,6 @@ test-suite sparrow-test
     , wai-middleware-content-type >=0.6.0
     , wai-transformers
     , websockets >=0.12.3.1
-    , websockets-simple >=0.1.0
+    , websockets-simple >=0.1.1
     , wuss
   default-language: Haskell2010

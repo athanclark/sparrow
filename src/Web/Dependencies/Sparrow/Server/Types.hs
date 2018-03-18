@@ -1,15 +1,20 @@
 {-# LANGUAGE
     GeneralizedNewtypeDeriving
   , DeriveFunctor
+  , DeriveGeneric
   , TupleSections
   , RankNTypes
   , ScopedTypeVariables
   , NamedFieldPuns
+  , FlexibleInstances
+  , MultiParamTypeClasses
+  , UndecidableInstances
   #-}
 
 module Web.Dependencies.Sparrow.Server.Types
   ( SparrowServerT
   , Env (..)
+  , newEnv
   , execSparrowServerT
   , execSparrowServerT'
   , tell'
@@ -32,6 +37,7 @@ module Web.Dependencies.Sparrow.Server.Types
   , addSubscriber
   , delSubscriber
   , delSubscriberFromAllTopics
+  , SparrowServerException (..)
   ) where
 
 import Web.Dependencies.Sparrow.Types (Topic (..), Broadcast, WithTopic (..), WSOutgoing (WSOutgoing))
@@ -45,30 +51,32 @@ import Data.Proxy (Proxy (..))
 import Data.Foldable (sequenceA_)
 import Data.Aeson (FromJSON, Value)
 import qualified Data.Aeson as Aeson
-import qualified ListT as ListT
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Control.Monad (forM_, join)
-import Control.Monad.Reader (ReaderT, runReaderT, ask)
-import Control.Monad.State (StateT, execStateT, modify')
+import Control.Monad (forM_)
+import Control.Monad.Reader (ReaderT (..), runReaderT, ask, MonadReader (..))
+import Control.Monad.State (StateT, execStateT, modify', MonadState (..))
+import Control.Monad.Writer (MonadWriter)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans (MonadTrans (lift))
+import Control.Monad.Catch (Exception, MonadCatch, MonadThrow, MonadMask)
 import Control.Concurrent.Async (Async, cancel)
-import Control.Concurrent.STM (STM, atomically, TVar, newTVarIO, writeTVar, readTVar, modifyTVar')
+import Control.Concurrent.STM (STM, atomically, TVar, newTVarIO, readTVar, modifyTVar')
 import Control.Concurrent.STM.TMapChan.Hash (TMapChan, newTMapChan)
 import qualified Control.Concurrent.STM.TMapChan.Hash as TMapChan
 import Control.Concurrent.STM.TMapMVar.Hash (TMapMVar, newTMapMVar)
 import qualified Control.Concurrent.STM.TMapMVar.Hash as TMapMVar
+import GHC.Generics (Generic)
 
 
 
 type SessionsOutgoing = TMapChan SessionID (WSOutgoing (WithTopic Value))
 
 sendTo :: Env m -> SessionID -> WSOutgoing (WithTopic Value) -> STM ()
-sendTo Env{envSessionsOutgoing} sID v =
-  TMapChan.insert envSessionsOutgoing sID v
+sendTo Env{envSessionsOutgoing} =
+  TMapChan.insert envSessionsOutgoing
 
 
 type RegisteredReceive m = -- STMMap.Map SessionID (STMMap.Map Topic (Value -> Maybe (m ())))
@@ -77,56 +85,45 @@ type RegisteredReceive m = -- STMMap.Map SessionID (STMMap.Map Topic (Value -> M
 
 -- unsafe because receiver isn't type-caste to the expected Topic
 unsafeRegisterReceive :: MonadIO m
-                      => Env m -> SessionID -> Topic -> (Value -> Maybe (m ())) -> IO ()
-unsafeRegisterReceive env@Env{envRegisteredReceive} sID topic f = do
+                      => Env m -> SessionID -> Topic -> (Value -> Maybe (m ())) -> STM ()
+unsafeRegisterReceive Env{envRegisteredReceive} sID topic f = do
   mTopics <- TMapMVar.tryObserve envRegisteredReceive sID
   case mTopics of
     Nothing -> do
-      topics <- atomically newTMapMVar
-      TMapMVar.insertForce topics topic f
-      putStrLn $ "No topics, adding.. " ++ show topic
-      TMapMVar.insertForce envRegisteredReceive sID topics
-      putStrLn "added."
-      ks <- getCurrentRegisteredTopics env sID
-      putStrLn $ "Topics...: " ++ show ks
-    Just topics -> do
+      topics <- newTMapMVar
+      TMapMVar.insert topics topic f
+      TMapMVar.insert envRegisteredReceive sID topics
+      -- ks <- getCurrentRegisteredTopics env sID
+      -- putStrLn $ " - unsafeRegisterReceive: Topics...: " ++ show ks
+    Just topics ->
       TMapMVar.insertForce topics topic f
 
 
-unregisterReceive :: Env m -> SessionID -> Topic -> IO ()
+unregisterReceive :: Env m -> SessionID -> Topic -> STM ()
 unregisterReceive Env{envRegisteredReceive} sID topic = do
-  putStrLn $ "Unregistering: " ++ show sID ++ ", " ++ show topic
   mTopics <- TMapMVar.tryObserve envRegisteredReceive sID
   case mTopics of
     Nothing -> pure ()
     Just topics -> TMapMVar.delete topics topic
 
-unregisterSession :: Env m -> SessionID -> IO ()
-unregisterSession Env{envRegisteredReceive} sID = do
-  putStrLn $ "Unregistering session: " ++ show sID
-  TMapMVar.delete envRegisteredReceive sID
+unregisterSession :: Env m -> SessionID -> STM ()
+unregisterSession Env{envRegisteredReceive} =
+  TMapMVar.delete envRegisteredReceive
 
 
 getCallReceive :: MonadIO m
-               => Env m -> SessionID -> Topic -> Value -> IO (Maybe (m ()))
+               => Env m -> SessionID -> Topic -> Value -> STM (Maybe (m ()))
 getCallReceive Env{envRegisteredReceive} sID topic v = do
-  putStrLn $ "Looking up session " ++ show sID
   topics <- TMapMVar.observe envRegisteredReceive sID
-  putStrLn $ "Looking up topic " ++ show topic
   onReceive <- TMapMVar.observe topics topic
-  putStrLn "Got onReceive"
   pure (onReceive v)
 
-getCurrentRegisteredTopics :: Env m -> SessionID -> IO [Topic]
+getCurrentRegisteredTopics :: Env m -> SessionID -> STM [Topic]
 getCurrentRegisteredTopics Env{envRegisteredReceive} sID = do
   mTopics <- TMapMVar.tryObserve envRegisteredReceive sID
   case mTopics of
-    Nothing -> do
-      putStrLn "Ain't got dick?"
-      -- topics <- atomically newTMapMVar
-      -- TMapMVar.insertForce envRegisteredReceive sID topics
-      pure []
-    Just topics -> atomically $ TMapMVar.keys topics
+    Nothing -> pure []
+    Just topics -> TMapMVar.keys topics
 
 type RegisteredTopicInvalidators = TVar (HashMap Topic (Value -> Maybe String))
 
@@ -249,6 +246,16 @@ data Env m = Env
   }
 
 
+newEnv :: IO (Env m)
+newEnv = Env
+  <$> atomically newTMapChan
+  <*> atomically newTMapMVar
+  <*> newTVarIO HM.empty
+  <*> newTVarIO HM.empty
+  <*> newTVarIO HM.empty
+  <*> newTVarIO HM.empty
+
+
 unsafeBroadcastTopic :: MonadIO m => Env m -> Topic -> Value -> m ()
 unsafeBroadcastTopic env t v =
   liftIO $ atomically $ do
@@ -272,30 +279,41 @@ type Paper http = RootedPredTrie Text http
 
 newtype SparrowServerT http m a = SparrowServerT
   { runSparrowServerT :: ReaderT (Env m) (StateT (Paper http) m) a
-  } deriving (Functor, Applicative, Monad, MonadIO)
+  } deriving (Functor, Applicative, Monad, MonadIO, MonadWriter w, MonadCatch, MonadThrow, MonadMask)
 
 instance MonadTrans (SparrowServerT http) where
   lift x = SparrowServerT (lift (lift x))
+
+instance MonadReader r m => MonadReader r (SparrowServerT http m) where
+  ask = lift ask
+  local f (SparrowServerT (ReaderT g)) = SparrowServerT $ ReaderT $ \env -> local f (g env)
+
+instance MonadState s m => MonadState s (SparrowServerT http m) where
+  get = lift get
+  put x = lift (put x)
+
+
+
+data SparrowServerException
+  = NoHandlerForTopic Topic
+  deriving (Show, Generic)
+
+instance Exception SparrowServerException
+
 
 
 execSparrowServerT :: MonadIO m
                    => SparrowServerT http m a
                    -> m (Paper http, Env m)
 execSparrowServerT x = do
-  env <- liftIO $  Env
-               <$> atomically newTMapChan
-               <*> atomically newTMapMVar
-               <*> newTVarIO HM.empty
-               <*> newTVarIO HM.empty
-               <*> newTVarIO HM.empty
-               <*> newTVarIO HM.empty
+  env <- liftIO newEnv
   (,env) <$> execSparrowServerT' env x
 
 execSparrowServerT' :: Monad m
                     => Env m
                     -> SparrowServerT http m a
                     -> m (Paper http)
-execSparrowServerT' env (SparrowServerT x) = do
+execSparrowServerT' env (SparrowServerT x) =
   execStateT (runReaderT x env) mempty
 
 
