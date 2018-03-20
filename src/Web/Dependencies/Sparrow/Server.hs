@@ -91,12 +91,11 @@ unpackServer :: forall m stM http initIn initOut deltaIn deltaOut
              => ToJSON initOut
              => FromJSON deltaIn
              => ToJSON deltaOut
-             => Topic
-             -> Server m initIn initOut deltaIn deltaOut
+             => Topic -- ^ Name of Dependency
+             -> Server m initIn initOut deltaIn deltaOut -- ^ Handler for all clients
              -> SparrowServerT http m (MiddlewareT m)
 unpackServer topic server = do
   env <- ask'
-
 
   -- register topic's invalidator for `deltaIn` globally
   liftIO $ atomically $
@@ -158,20 +157,22 @@ unpackServer topic server = do
                   )
                 addSubscriber env topic withSessionIDSessionID
 
-              thread <- Aligned.liftBaseWith $ \runInBase ->
-                async $ (\x -> runSingleton <$> runInBase x) $ serverOnOpen serverArgs
+              mThread <- serverOnOpen serverArgs
 
-              liftIO $ atomically $
-                -- register onOpen thread
-                registerOnOpenThread env withSessionIDSessionID topic thread
+              case mThread of
+                Nothing -> pure ()
+                Just thread -> liftIO $ atomically $
+                  -- register onOpen thread
+                  registerOnOpenThread env withSessionIDSessionID topic thread
 
               (NR.action $ NR.post $ NR.json serverInitOut) app req resp
 
 
+-- | Match an individual dependency
 match :: Monad m
       => Match xs' xs childHttp resultHttp
-      => UrlChunks xs
-      -> childHttp
+      => UrlChunks xs -- ^ Should match the dependency name
+      -> childHttp -- ^ 'Network.Wai.Trans.MiddlewareT', or a function to one
       -> SparrowServerT resultHttp m ()
 match ts http =
   tell' (singleton ts http)
@@ -183,10 +184,11 @@ type MatchGroup xs' xs childHttp resultHttp =
   )
 
 
+-- | Group together a set of dependencies
 matchGroup :: Monad m
            => MatchGroup xs' xs childHttp resultHttp
-           => UrlChunks xs
-           -> SparrowServerT childHttp m ()
+           => UrlChunks xs -- ^ Common 'Topic' prefix
+           -> SparrowServerT childHttp m () -- ^ Set of handlers
            -> SparrowServerT resultHttp m ()
 matchGroup ts x = do
   env <- ask'
@@ -194,14 +196,14 @@ matchGroup ts x = do
   tell' (extrude ts http)
 
 
-
+-- | Host dependencies and websocket
 serveDependencies :: forall m stM sec a
                    . MonadBaseControl IO m
                   => Aligned.MonadBaseControl IO m stM
                   => Extractable stM
                   => MonadIO m
                   => MonadCatch m
-                  => SparrowServerT (MiddlewareT m) m a
+                  => SparrowServerT (MiddlewareT m) m a -- ^ Dependencies
                   -> m (RouterT (MiddlewareT m) sec m ())
 serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
   let runM :: forall b. m b -> IO b

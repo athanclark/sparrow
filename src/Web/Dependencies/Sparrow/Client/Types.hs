@@ -28,9 +28,8 @@ import qualified Control.Concurrent.STM.TMapMVar as TMapMVar
 import GHC.Generics (Generic)
 
 
--- data ClientRefs m = ClientRefs
---   { clientContinue :: Maybe Value {-initOut-} -> m ()
---   }
+
+-- * Internal Machinery
 
 type RegisteredTopicSubscriptions m =
   TMapMVar Topic
@@ -58,12 +57,7 @@ callOnReceive Env{envSubscriptions} topic v = do
   onReceive v
 
 
-data Env m = Env
-  { envSendDelta     :: WSIncoming (WithTopic Value) -> m ()
-  , envSendInit      :: Topic -> Value -> m (Maybe Value)
-  , envSubscriptions :: {-# UNPACK #-} !(RegisteredTopicSubscriptions m)
-  }
-
+-- * Context
 
 newtype SparrowClientT m a = SparrowClientT
   { runSparrowClientT :: ReaderT (Env m) m a
@@ -75,6 +69,18 @@ instance MonadReader r m => MonadReader r (SparrowClientT m) where
 
 instance MonadTrans SparrowClientT where
   lift = SparrowClientT . lift
+
+data Env m = Env
+  { envSendDelta     :: WSIncoming (WithTopic Value) -> m ()
+  , envSendInit      :: Topic -> Value -> m (Maybe Value)
+  , envSubscriptions :: {-# UNPACK #-} !(RegisteredTopicSubscriptions m)
+  }
+
+ask' :: Applicative m => SparrowClientT m (Env m)
+ask' = SparrowClientT (ReaderT pure)
+
+
+-- * Exceptions
 
 
 data SparrowClientException
@@ -89,6 +95,3 @@ data SparrowClientException
 
 instance Exception SparrowClientException
 
-
-ask' :: Applicative m => SparrowClientT m (Env m)
-ask' = SparrowClientT (ReaderT pure)

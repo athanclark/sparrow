@@ -19,6 +19,7 @@ import Data.Aeson.Attoparsec (attoAeson)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
 import Control.Applicative ((<|>))
 import Control.DeepSeq (NFData)
+import Control.Concurrent.Async (Async)
 import GHC.Generics (Generic)
 
 
@@ -34,10 +35,9 @@ data ServerArgs m deltaOut = ServerArgs
 data ServerReturn m initOut deltaIn deltaOut = ServerReturn
   { serverInitOut   :: initOut
   , serverOnOpen    :: ServerArgs m deltaOut
-                    -> m ()
-    -- ^ only after initOut is provided can we send deltas - invoked once, and should
-    -- return a totally 'Control.Concurrent.Async.link'ed thread (if spawned)
-    -- to kill with the subscription dies
+                    -> m (Maybe (Async ()))
+    -- ^ invoked once, and should return a 'Control.Concurrent.Async.link'ed long-lived thread
+    -- to kill when the subscription dies
   , serverOnReceive :: ServerArgs m deltaOut
                     -> deltaIn -> m () -- ^ invoked for each receive
   }
@@ -55,7 +55,7 @@ type Server m initIn initOut deltaIn deltaOut =
 -- ** Client
 
 data ClientReturn m initOut deltaIn = ClientReturn
-  { clientSendCurrent   :: deltaIn -> m () -- was vs. can't be successful?
+  { clientSendCurrent   :: deltaIn -> m ()
   , clientInitOut       :: initOut
   , clientUnsubscribe   :: m ()
   }
@@ -63,7 +63,7 @@ data ClientReturn m initOut deltaIn = ClientReturn
 data ClientArgs m initIn initOut deltaIn deltaOut = ClientArgs
   { clientReceive  :: ClientReturn m initOut deltaIn -> deltaOut -> m ()
   , clientInitIn   :: initIn
-  , clientOnReject :: m () -- ^ From a delta rejection, not init one
+  , clientOnReject :: m () -- ^ Run if the server decides to randomly kick the client
   }
 
 type Client m initIn initOut deltaIn deltaOut =

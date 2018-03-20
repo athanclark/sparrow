@@ -69,8 +69,8 @@ unpackClient :: forall m stM initIn initOut deltaIn deltaOut
              => FromJSON initOut
              => ToJSON deltaIn
              => FromJSON deltaOut
-             => Topic
-             -> Client m initIn initOut deltaIn deltaOut
+             => Topic -- ^ Dependency name
+             -> Client m initIn initOut deltaIn deltaOut -- ^ Handler
              -> SparrowClientT m ()
 unpackClient topic client = do
   env@Env{envSendInit,envSendDelta} <- ask'
@@ -83,13 +83,13 @@ unpackClient topic client = do
 
     -- spawn a new thread for the client
     thread <- async $ runM $ client $ \ClientArgs{clientReceive,clientInitIn,clientOnReject} -> do
-      -- ** invoke init
+      -- invoke init
       mInitOut <- envSendInit topic (Aeson.toJSON clientInitIn)
 
       case mInitOut of
         Nothing -> do
           _ <- throwM InitOutFailed
-          pure Nothing -- TODO throw error
+          pure Nothing
         Just v -> case Aeson.fromJSON v of
           Aeson.Error e -> do
             _ <- throwM (InitOutDecodingError e)
@@ -141,7 +141,7 @@ allocateDependencies :: forall m stM a
                      => Extractable stM
                      => Bool -- ^ TLS
                      -> URIAuth -- ^ Hostname
-                     -> SparrowClientT m a
+                     -> SparrowClientT m a -- ^ All dependencies
                      -> m ()
 allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowClientT} = Aligned.liftBaseWith $ \runInBase -> do
   let path = [absdir|/dependencies/|]

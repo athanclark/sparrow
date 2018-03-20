@@ -12,32 +12,39 @@
   #-}
 
 module Web.Dependencies.Sparrow.Server.Types
-  ( SparrowServerT
+  ( -- * Context
+    SparrowServerT
   , Env (..)
   , newEnv
   , execSparrowServerT
   , execSparrowServerT'
   , tell'
   , ask'
-  , unsafeBroadcastTopic
+  , -- * Internal Machinery
+    -- ** Outgoing Per-Session
+    unsafeBroadcastTopic
   , unsafeRegisterReceive
   , sendTo
-  , registerOnUnsubscribe
-  , registerOnOpenThread
+  , -- ** Continuation Registration
+    registerOnUnsubscribe
   , registerInvalidator
   , broadcaster
   , getCurrentRegisteredTopics
   , getCallReceive
-  , killOnOpenThread
-  , killAllOnOpenThreads
   , callOnUnsubscribe
   , callAllOnUnsubscribe
-  , unregisterReceive
+  , -- ** Thread Management
+    registerOnOpenThread
+  , killOnOpenThread
+  , killAllOnOpenThreads
+  , -- ** Bookkeeping
+    unregisterReceive
   , unregisterSession
   , addSubscriber
   , delSubscriber
   , delSubscriberFromAllTopics
-  , SparrowServerException (..)
+  , -- * Exceptions
+    SparrowServerException (..)
   ) where
 
 import Web.Dependencies.Sparrow.Types (Topic (..), Broadcast, WithTopic (..), WSOutgoing (WSOutgoing))
@@ -145,7 +152,7 @@ type RegisteredTopicSubscribers = TVar (HashMap Topic (HashSet SessionID))
 addSubscriber :: Env m -> Topic -> SessionID -> STM ()
 addSubscriber Env{envRegisteredTopicSubscribers} topic sID =
   modifyTVar' envRegisteredTopicSubscribers
-    (HM.alter (maybe (Just (HS.singleton sID)) (Just . HS.insert sID)) topic)
+    (HM.alter (Just . maybe (HS.singleton sID) (HS.insert sID)) topic)
 
 delSubscriber :: Env m -> Topic -> SessionID -> STM ()
 delSubscriber Env{envRegisteredTopicSubscribers} topic sID =
@@ -182,9 +189,7 @@ callOnUnsubscribe Env{envRegisteredOnUnsubscribe} sID topic = do
         let x = HM.lookup topic topics
         modifyTVar' envRegisteredOnUnsubscribe (HM.adjust (HM.delete topic) sID)
         pure x
-  case mEff of
-    Nothing -> pure ()
-    Just eff -> eff
+  fromMaybe (pure ()) mEff
 
 callAllOnUnsubscribe :: MonadIO m => Env m -> SessionID -> m ()
 callAllOnUnsubscribe Env{envRegisteredOnUnsubscribe} sID = do
