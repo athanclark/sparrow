@@ -10,7 +10,7 @@ module Web.Dependencies.Sparrow.Types where
 import Web.Dependencies.Sparrow.Session (SessionID)
 
 import Data.Hashable (Hashable)
-import Data.Text (Text, intercalate)
+import Data.Text (Text, intercalate, unpack)
 import qualified Data.Text.Lazy.Encoding as LT
 import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), (.=), object, (.:))
@@ -75,7 +75,10 @@ type Client m initIn initOut deltaIn deltaOut =
 -- ** Topic
 
 newtype Topic = Topic {getTopic :: [Text]}
-  deriving (Eq, Ord, Generic, Hashable, Show, NFData)
+  deriving (Eq, Ord, Generic, Hashable, NFData)
+
+instance Show Topic where
+  show (Topic x) = unpack (intercalate "/" x)
 
 instance FromJSON Topic where
   parseJSON = attoAeson (Topic <$> breaker)
