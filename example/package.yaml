@@ -44,7 +44,7 @@ executables:
     - monad-control
     - monad-control-aligned
     - mtl
-    - nested-routes >= 8.2.0
+    - nested-routes >= 9.0.0.1
     - wai-transformers
     - wai-middleware-content-type
     - wai

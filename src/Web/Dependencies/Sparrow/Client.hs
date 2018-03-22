@@ -50,8 +50,8 @@ import Control.Exception (evaluate)
 import Path (Path, Abs, Rel, File, toFilePath, parseRelFile, (</>), parent, dirname, absdir)
 import Path.Extended (Location, fromPath, (<&>))
 import System.IO.Unsafe (unsafePerformIO)
-import Network.Wai.Trans (runClientAppT)
 import Network.WebSockets (runClient)
+import Network.WebSockets.Trans (runClientAppT)
 import Network.WebSockets.Simple (WebSocketsApp (..), WebSocketsAppParams (..), toClientAppT, expBackoffStrategy)
 import Network.WebSockets.Simple.PingPong (pingPong)
 import Network.HTTP.Client (parseRequest, newManager, defaultManagerSettings, method, requestBody, responseBody, responseStatus, httpLbs, RequestBody (RequestBodyLBS))
@@ -167,8 +167,9 @@ allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowCli
             f | tls = runSecureClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) (show loc)
               | otherwise = runClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) (show loc)
 
-        x' <- runM $ pingPong ((10^6) * 10) x -- every 10 seconds
-        f $ runClientAppT runM $ toClientAppT x'
+        x' <- runM (pingPong ((10^6) * 10) x) -- every 10 seconds
+        x'' <- runM (runClientAppT (toClientAppT x'))
+        f x''
 
   ( toWSThread :: TMVar (Async ())
     ) <- newEmptyTMVarIO

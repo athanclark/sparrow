@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ccdf432efa6288184fab9b8d0c38172393e4944f8b80812f954aa935d4a8aaa2
+-- hash: 05a27ac4d1dd73a6587f6d32bf5880a61a1907ac50a75f7c1ed243e1c3138a8b
 
 name:           sparrow
 version:        0.0.1
@@ -57,7 +57,7 @@ library
     , monad-control
     , monad-control-aligned
     , mtl
-    , nested-routes >=9.0.0
+    , nested-routes >=9.0.0.1
     , path
     , path-extra >=0.0.6
     , pred-trie >=0.6.0.1
@@ -70,57 +70,10 @@ library
     , unordered-containers
     , urlpath >=8.0.1
     , uuid
-    , wai-middleware-content-type >=0.6.0
-    , wai-transformers
-    , websockets >=0.12.3.1
-    , websockets-simple >=0.1.1
-    , wuss
-  default-language: Haskell2010
-
-test-suite sparrow-test
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  other-modules:
-      Paths_sparrow
-  hs-source-dirs:
-      test
-  ghc-options: -Wall -threaded -rtsopts -Wall -with-rtsopts=-N
-  build-depends:
-      aeson
-    , aeson-attoparsec
-    , async
-    , attoparsec
-    , attoparsec-uri >=0.0.4
-    , base >=4.7 && <5
-    , bytestring
-    , deepseq
-    , exceptions
-    , extractable-singleton
-    , hashable
-    , http-client
-    , http-client-tls
-    , http-types
-    , list-t
-    , monad-control
-    , monad-control-aligned
-    , mtl
-    , nested-routes >=9.0.0
-    , path
-    , path-extra >=0.0.6
-    , pred-trie >=0.6.0.1
-    , sparrow
-    , stm
-    , strict
-    , text
-    , tmapchan
-    , tmapmvar >=0.0.4
-    , transformers
-    , unordered-containers
-    , urlpath >=8.0.1
-    , uuid
-    , wai-middleware-content-type >=0.6.0
-    , wai-transformers
-    , websockets >=0.12.3.1
-    , websockets-simple >=0.1.1
+    , wai >=0.12.4
+    , wai-middleware-content-type >=0.6.1.1
+    , wai-transformers >=0.1.0
+    , websockets >=0.12.4.0
+    , websockets-simple >=0.1.2.1
     , wuss
   default-language: Haskell2010

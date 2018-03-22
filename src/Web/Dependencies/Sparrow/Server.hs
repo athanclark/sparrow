@@ -72,9 +72,11 @@ import Control.Concurrent.STM (TMVar, atomically, newEmptyTMVarIO, tryTakeTMVar,
 import qualified Control.Concurrent.STM.TMapChan.Hash as TMapChan
 import Control.Exception (evaluate)
 import Control.DeepSeq (NFData (rnf))
-import Network.Wai.Trans (MiddlewareT, strictRequestBody, queryString, websocketsOrT)
+import Network.Wai (strictRequestBody, queryString)
+import Network.Wai.Trans (MiddlewareT)
 import Network.Wai.Middleware.ContentType.Json (jsonOnly)
 import Network.WebSockets (defaultConnectionOptions)
+import Network.WebSockets.Trans (websocketsOrT)
 import Network.WebSockets.Simple (WebSocketsApp (..), WebSocketsAppParams (..), toServerAppT)
 import Network.WebSockets.Simple.PingPong (pingPong)
 import Network.HTTP.Types (status400)
@@ -165,7 +167,7 @@ unpackServer topic server = do
                   -- register onOpen thread
                   registerOnOpenThread env withSessionIDSessionID topic thread
 
-              (NR.action $ NR.post $ NR.json serverInitOut) app req resp
+              (NR.action $ NR.post $ \_ -> NR.json serverInitOut) app req resp
 
 
 -- | Match an individual dependency
@@ -276,7 +278,7 @@ serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
 
         wsApp' <- pingPong ((10^6) * 10) wsApp -- every 10 seconds
 
-        (websocketsOrT runM defaultConnectionOptions (toServerAppT wsApp')) app req resp
+        (websocketsOrT defaultConnectionOptions (toServerAppT wsApp')) app req resp
 
     -- RESTful initIn -> initOut endpoints
     RouterT (modify' (<> NR.Tries httpTrie mempty mempty))

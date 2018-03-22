@@ -41,7 +41,7 @@ dependencies:
 - monad-control
 - monad-control-aligned
 - mtl
-- nested-routes >= 9.0.0
+- nested-routes >= 9.0.0.1
 - path
 - path-extra >= 0.0.6
 - pred-trie >= 0.6.0.1
@@ -54,23 +54,12 @@ dependencies:
 - unordered-containers
 - urlpath >= 8.0.1
 - uuid
+- wai >= 0.12.4
 - wai-middleware-content-type >= 0.6.1.1
 - wai-transformers >= 0.1.0
-- websockets >= 0.12.3.1
-- websockets-simple >= 0.1.1
+- websockets >= 0.12.4.0
+- websockets-simple >= 0.1.2.1
 - wuss
 
 library:
   source-dirs: src
-
-tests:
-  sparrow-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -Wall
-    - -with-rtsopts=-N
-    dependencies:
-    - sparrow
