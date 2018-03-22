@@ -46,13 +46,13 @@ dependencies:
 - strict
 - text
 - tmapchan
-- tmapmvar == 0.0.3
+- tmapmvar >= 0.0.4
 - transformers
 - unordered-containers
 - urlpath >= 8.0.1
 - uuid
-- wai-middleware-content-type >= 0.6.0
-- wai-transformers
+- wai-middleware-content-type >= 0.6.1.1
+- wai-transformers >= 0.1.0
 - websockets >= 0.12.3.1
 - websockets-simple >= 0.1.0
 - wuss
