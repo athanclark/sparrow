@@ -1,10 +1,12 @@
 name:                sparrow
-version:             0.0.0
+version:             0.0.1
 git:                 "git://git.localcooking.com/tooling/sparrow.git"
 license:             BSD3
 author:              "Athan Clark"
 maintainer:          "athan.clark@localcooking.com"
 copyright:           "2018 Local Cooking Inc."
+category:            Web
+synopsis:            Unified streaming dependency management for web apps
 
 ghc-options: -Wall
 
@@ -28,6 +30,7 @@ dependencies:
 - attoparsec
 - attoparsec-uri >= 0.0.4
 - bytestring
+- deepseq
 - exceptions
 - extractable-singleton
 - hashable
@@ -38,10 +41,10 @@ dependencies:
 - monad-control
 - monad-control-aligned
 - mtl
-- nested-routes >= 8.2.0
+- nested-routes >= 9.0.0
 - path
 - path-extra >= 0.0.6
-- pred-trie
+- pred-trie >= 0.6.0.1
 - stm
 - strict
 - text
@@ -54,7 +57,7 @@ dependencies:
 - wai-middleware-content-type >= 0.6.1.1
 - wai-transformers >= 0.1.0
 - websockets >= 0.12.3.1
-- websockets-simple >= 0.1.0
+- websockets-simple >= 0.1.1
 - wuss
 
 library:

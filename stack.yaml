@@ -41,12 +41,14 @@ packages:
 extra-deps:
   - aeson-attoparsec-0.0.0
   - attoparsec-uri-0.0.4
-  - nested-routes-8.2.0
-  - tmapmvar-0.0.3
+  - nested-routes-9.0.0
+  - pred-trie-0.6.0.1
+  - tmapmvar-0.0.4
+  - tries-0.0.5
   - urlpath-8.0.1
   - wai-middleware-content-type-0.6.0
   - wai-middleware-verbs-0.3.2
-  - websockets-simple-0.1.0
+  - websockets-simple-0.1.1
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

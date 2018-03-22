@@ -10,7 +10,7 @@ module Web.Dependencies.Sparrow.Types where
 import Web.Dependencies.Sparrow.Session (SessionID)
 
 import Data.Hashable (Hashable)
-import Data.Text (Text, intercalate)
+import Data.Text (Text, intercalate, unpack)
 import qualified Data.Text.Lazy.Encoding as LT
 import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), (.=), object, (.:))
@@ -18,6 +18,8 @@ import Data.Aeson.Types (typeMismatch)
 import Data.Aeson.Attoparsec (attoAeson)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
 import Control.Applicative ((<|>))
+import Control.DeepSeq (NFData)
+import Control.Concurrent.Async (Async)
 import GHC.Generics (Generic)
 
 
@@ -33,10 +35,9 @@ data ServerArgs m deltaOut = ServerArgs
 data ServerReturn m initOut deltaIn deltaOut = ServerReturn
   { serverInitOut   :: initOut
   , serverOnOpen    :: ServerArgs m deltaOut
-                    -> m ()
-    -- ^ only after initOut is provided can we send deltas - invoked once, and should
-    -- return a totally 'Control.Concurrent.Async.link'ed thread (if spawned)
-    -- to kill with the subscription dies
+                    -> m (Maybe (Async ()))
+    -- ^ invoked once, and should return a 'Control.Concurrent.Async.link'ed long-lived thread
+    -- to kill when the subscription dies
   , serverOnReceive :: ServerArgs m deltaOut
                     -> deltaIn -> m () -- ^ invoked for each receive
   }
@@ -54,7 +55,7 @@ type Server m initIn initOut deltaIn deltaOut =
 -- ** Client
 
 data ClientReturn m initOut deltaIn = ClientReturn
-  { clientSendCurrent   :: deltaIn -> m () -- was vs. can't be successful?
+  { clientSendCurrent   :: deltaIn -> m ()
   , clientInitOut       :: initOut
   , clientUnsubscribe   :: m ()
   }
@@ -62,7 +63,7 @@ data ClientReturn m initOut deltaIn = ClientReturn
 data ClientArgs m initIn initOut deltaIn deltaOut = ClientArgs
   { clientReceive  :: ClientReturn m initOut deltaIn -> deltaOut -> m ()
   , clientInitIn   :: initIn
-  , clientOnReject :: m () -- ^ From a delta rejection, not init one
+  , clientOnReject :: m () -- ^ Run if the server decides to randomly kick the client
   }
 
 type Client m initIn initOut deltaIn deltaOut =
@@ -74,7 +75,10 @@ type Client m initIn initOut deltaIn deltaOut =
 -- ** Topic
 
 newtype Topic = Topic {getTopic :: [Text]}
-  deriving (Eq, Ord, Generic, Hashable, Show)
+  deriving (Eq, Ord, Generic, Hashable, NFData)
+
+instance Show Topic where
+  show (Topic x) = unpack (intercalate "/" x)
 
 instance FromJSON Topic where
   parseJSON = attoAeson (Topic <$> breaker)
@@ -98,7 +102,9 @@ type Broadcast m = Topic -> m (Maybe (Value -> Maybe (m ())))
 data WithSessionID a = WithSessionID
   { withSessionIDSessionID :: {-# UNPACK #-} !SessionID
   , withSessionIDContent   :: a
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WithSessionID a)
 
 instance ToJSON a => ToJSON (WithSessionID a) where
   toJSON WithSessionID{..} = object
@@ -113,7 +119,9 @@ instance FromJSON a => FromJSON (WithSessionID a) where
 data WithTopic a = WithTopic
   { withTopicTopic   :: !Topic
   , withTopicContent :: a
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WithTopic a)
 
 instance ToJSON a => ToJSON (WithTopic a) where
   toJSON WithTopic{..} = object
@@ -131,7 +139,9 @@ data InitResponse a
   | InitDecodingError !String -- when manually decoding the content, casted
   | InitRejected
   | InitResponse a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (InitResponse a)
 
 instance ToJSON a => ToJSON (InitResponse a) where
   toJSON x = case x of
@@ -163,6 +173,9 @@ instance FromJSON a => FromJSON (InitResponse a) where
 
 data WSHTTPResponse
   = NoSessionID
+  deriving (Eq, Show, Generic)
+
+instance NFData WSHTTPResponse
 
 instance ToJSON WSHTTPResponse where
   toJSON x = case x of
@@ -187,7 +200,9 @@ data WSIncoming a
     { wsUnsubscribeTopic :: !Topic
     }
   | WSIncoming a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WSIncoming a)
 
 instance ToJSON a => ToJSON (WSIncoming a) where
   toJSON x = case x of
@@ -208,7 +223,9 @@ data WSOutgoing a
   | WSTopicRejected !Topic
   | WSDecodingError !String
   | WSOutgoing a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
+
+instance NFData a => NFData (WSOutgoing a)
 
 instance ToJSON a => ToJSON (WSOutgoing a) where
   toJSON x = case x of

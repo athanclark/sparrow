@@ -48,6 +48,7 @@ import Web.Dependencies.Sparrow.Server.Types
   , addSubscriber
   , delSubscriber
   , delSubscriberFromAllTopics
+  , SparrowServerException (..)
   )
 
 import Web.Routes.Nested (Match, UrlChunks, RouterT (..), ExtrudeSoundly)
@@ -63,18 +64,20 @@ import Control.Monad (join, forever)
 import Control.Monad.Trans (lift)
 import Control.Monad.State (modify')
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Catch (MonadCatch)
+import Control.Monad.Catch (MonadCatch, MonadThrow (..))
 import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Control.Monad.Trans.Control.Aligned as Aligned
 import Control.Concurrent.Async (Async, async, cancel)
-import Control.Concurrent.STM (TMVar, atomically, newEmptyTMVarIO, tryTakeTMVar, putTMVar, isEmptyTMVar, swapTMVar)
+import Control.Concurrent.STM (TMVar, atomically, newEmptyTMVarIO, tryTakeTMVar, putTMVar)
 import qualified Control.Concurrent.STM.TMapChan.Hash as TMapChan
+import Control.Exception (evaluate)
+import Control.DeepSeq (NFData (rnf))
 import Network.Wai.Trans (MiddlewareT, strictRequestBody, queryString, websocketsOrT)
 import Network.Wai.Middleware.ContentType.Json (jsonOnly)
 import Network.WebSockets (defaultConnectionOptions)
 import Network.WebSockets.Simple (WebSocketsApp (..), WebSocketsAppParams (..), toServerAppT)
+import Network.WebSockets.Simple.PingPong (pingPong)
 import Network.HTTP.Types (status400)
-import System.IO.Unsafe (unsafePerformIO)
 
 
 
@@ -88,8 +91,8 @@ unpackServer :: forall m stM http initIn initOut deltaIn deltaOut
              => ToJSON initOut
              => FromJSON deltaIn
              => ToJSON deltaOut
-             => Topic
-             -> Server m initIn initOut deltaIn deltaOut
+             => Topic -- ^ Name of Dependency
+             -> Server m initIn initOut deltaIn deltaOut -- ^ Handler for all clients
              -> SparrowServerT http m (MiddlewareT m)
 unpackServer topic server = do
   env <- ask'
@@ -110,7 +113,7 @@ unpackServer topic server = do
         Aeson.Error e -> resp (jsonOnly (InitDecodingError e :: InitResponse ()) status400 [])
         Aeson.Success (initIn :: initIn) -> do
 
-          -- invoke Server
+          -- ##  invoke Server
           mContinue <- server initIn
           case mContinue of
             Nothing -> resp (jsonOnly (InitRejected :: InitResponse ()) status400 [])
@@ -125,17 +128,14 @@ unpackServer topic server = do
               let serverArgs :: ServerArgs m deltaOut
                   serverArgs = ServerArgs
                     { serverDeltaReject = liftIO $ do
-                      unregisterReceive env withSessionIDSessionID topic
                       atomically $ do
+                        unregisterReceive env withSessionIDSessionID topic
                         delSubscriber env topic withSessionIDSessionID
 
                         sendTo env withSessionIDSessionID (WSTopicRejected topic)
                       killOnOpenThread env withSessionIDSessionID topic
-                    , serverSendCurrent = \x -> do
-                      liftIO $ do
-                        let x' = WSOutgoing (WithTopic topic (toJSON x))
-                        putStrLn $ "Loading toSend: " ++ show (withSessionIDSessionID,x')
-                        atomically (sendTo env withSessionIDSessionID x')
+                    , serverSendCurrent =
+                      liftIO . atomically . sendTo env withSessionIDSessionID . WSOutgoing . WithTopic topic . toJSON
                     }
 
               ServerReturn
@@ -144,39 +144,35 @@ unpackServer topic server = do
                 , serverOnReceive
                 } <- serverContinue (broadcaster env)
 
-              liftIO $ do
-                putStrLn "Registering onReceive..."
                 -- register onReceive
                 -- TODO security policy for consuming sessionIDs, expiring & pending
                 -- check if currently "used", reject if topic is already subscribed
                 --   - can have pending sessionIDs... for a while
                 -- check if currently subscribed to that topic
+              liftIO $ atomically $ do
                 unsafeRegisterReceive env withSessionIDSessionID topic
                   (\v -> case Aeson.fromJSON v of
-                      Aeson.Error e -> unsafePerformIO $ Nothing <$ putStrLn ("Error, deltaIn decoding error: " ++ e)
+                      Aeson.Error _ -> Nothing
                       Aeson.Success (x :: deltaIn) -> Just (serverOnReceive serverArgs x)
                   )
+                addSubscriber env topic withSessionIDSessionID
 
-                topics <- getCurrentRegisteredTopics env withSessionIDSessionID
-                putStrLn $ "Topics...? " ++ show topics
+              mThread <- serverOnOpen serverArgs
 
-                atomically $
-                  addSubscriber env topic withSessionIDSessionID
-
-              thread <- Aligned.liftBaseWith $ \runInBase ->
-                async $ (\x -> runSingleton <$> runInBase x) $ serverOnOpen serverArgs
-
-              liftIO $ atomically $ do
-                -- register onOpen thread
-                registerOnOpenThread env withSessionIDSessionID topic thread
+              case mThread of
+                Nothing -> pure ()
+                Just thread -> liftIO $ atomically $
+                  -- register onOpen thread
+                  registerOnOpenThread env withSessionIDSessionID topic thread
 
               (NR.action $ NR.post $ NR.json serverInitOut) app req resp
 
 
+-- | Match an individual dependency
 match :: Monad m
       => Match xs' xs childHttp resultHttp
-      => UrlChunks xs
-      -> childHttp
+      => UrlChunks xs -- ^ Should match the dependency name
+      -> childHttp -- ^ 'Network.Wai.Trans.MiddlewareT', or a function to one
       -> SparrowServerT resultHttp m ()
 match ts http =
   tell' (singleton ts http)
@@ -188,10 +184,11 @@ type MatchGroup xs' xs childHttp resultHttp =
   )
 
 
+-- | Group together a set of dependencies
 matchGroup :: Monad m
            => MatchGroup xs' xs childHttp resultHttp
-           => UrlChunks xs
-           -> SparrowServerT childHttp m ()
+           => UrlChunks xs -- ^ Common 'Topic' prefix
+           -> SparrowServerT childHttp m () -- ^ Set of handlers
            -> SparrowServerT resultHttp m ()
 matchGroup ts x = do
   env <- ask'
@@ -199,95 +196,88 @@ matchGroup ts x = do
   tell' (extrude ts http)
 
 
-
+-- | Host dependencies and websocket
 serveDependencies :: forall m stM sec a
                    . MonadBaseControl IO m
                   => Aligned.MonadBaseControl IO m stM
                   => Extractable stM
                   => MonadIO m
                   => MonadCatch m
-                  => SparrowServerT (MiddlewareT m) m a
+                  => SparrowServerT (MiddlewareT m) m a -- ^ Dependencies
                   -> m (RouterT (MiddlewareT m) sec m ())
 serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
   let runM :: forall b. m b -> IO b
       runM x = runSingleton <$> runInBase x
 
-  pure $ do
-    (httpTrie, env@Env{envSessionsOutgoing}) <- lift (execSparrowServerT server)
+  (httpTrie,env@Env{envSessionsOutgoing}) <- runM (execSparrowServerT server)
 
-    NR.matchGroup (NR.l_ "dependencies" NR.</> NR.o_) $ do
-      -- RESTful initIn -> initOut endpoints
-      RouterT (modify' (<> NR.Tries httpTrie mempty mempty))
+  evaluate (rnf httpTrie)
 
-      -- websocket
-      NR.matchHere $ \app req resp -> case join (lookup "sessionID" (queryString req))
-                                           >>= UUID.fromASCIIBytes of
-        Nothing -> resp (jsonOnly NoSessionID status400 [])
-        Just sID -> do
-          let sessionID = SessionID sID
+  pure $ NR.matchGroup (NR.l_ "dependencies" NR.</> NR.o_) $ do
+    -- websocket
+    NR.matchHere $ \app req resp -> case join (lookup "sessionID" (queryString req))
+                                          >>= UUID.fromASCIIBytes of
+      Nothing -> resp (jsonOnly NoSessionID status400 [])
+      Just sID -> do
+        let sessionID = SessionID sID
 
-          -- For listening on the outgoing TMapChan envSessionsOutgoing
-          (outgoingListener :: TMVar (Async ())) <- liftIO newEmptyTMVarIO
+        -- For listening on the outgoing TMapChan envSessionsOutgoing
+        (outgoingListener :: TMVar (Async ())) <- liftIO newEmptyTMVarIO
 
-          let wsApp :: WebSocketsApp m (WSIncoming (WithTopic Value)) (WSOutgoing (WithTopic Value))
-              wsApp = WebSocketsApp
-                { onOpen = \WebSocketsAppParams{send} -> do
-                    liftIO $ do
-                      putStrLn $ "Opened session " ++ show sessionID
-                      ks <- getCurrentRegisteredTopics env sessionID
-                      putStrLn $ "Fucking topics?? " ++ show ks
-                      -- spawn and store TMapChan envSessionsOutgoing listener
-                      listener <- async $ forever $ do
-                        x <- atomically (TMapChan.lookup envSessionsOutgoing sessionID)
-                        putStrLn $ "Sending... " ++ show x
-                        runM (send x)
-                      atomically $ putTMVar outgoingListener listener
+        let wsApp :: WebSocketsApp m (WSIncoming (WithTopic Value)) (WSOutgoing (WithTopic Value))
+            wsApp = WebSocketsApp
+              { onOpen = \WebSocketsAppParams{send} -> do
+                  liftIO $ do
+                    -- spawn and store TMapChan envSessionsOutgoing listener
+                    listener <- async $ forever $ do
+                      x <- atomically (TMapChan.lookup envSessionsOutgoing sessionID)
+                      runM (send x)
+                    atomically $ putTMVar outgoingListener listener
 
-                    initSubs <- liftIO $ getCurrentRegisteredTopics env sessionID
+                  initSubs <- liftIO $ atomically $ getCurrentRegisteredTopics env sessionID
 
-                    liftIO $ putStrLn $ "Uh... got initSubs: " ++ show initSubs
-                
-                    send (WSTopicsSubscribed initSubs)
+                  send (WSTopicsSubscribed initSubs)
 
-                , onReceive = \WebSocketsAppParams{send} r -> case r of
+              , onReceive = \WebSocketsAppParams{send} r -> do
+                  case r of
                     WSUnsubscribe topic -> do
-                      liftIO $ do
-                        killOnOpenThread env sessionID topic
+                      liftIO $ atomically $ do
                         unregisterReceive env sessionID topic
-                        atomically $ do
-                          delSubscriber env topic sessionID
+                        delSubscriber env topic sessionID
 
                       callOnUnsubscribe env sessionID topic
 
                       -- update client of removed subscription
                       send (WSTopicRemoved topic)
 
-                    WSIncoming (WithTopic topic x) -> do
-                      liftIO $ putStrLn $ "received: " ++ show (topic, x)
-                      mEff <- liftIO $ getCallReceive env sessionID topic x
-                      liftIO $ putStrLn "Got effect"
+                      liftIO $ killOnOpenThread env sessionID topic
 
+                    WSIncoming (WithTopic topic x) -> do
+                      mEff <- liftIO $ atomically $ getCallReceive env sessionID topic x
                       case mEff of
-                        Nothing -> liftIO $ do
-                          topics <- getCurrentRegisteredTopics env sessionID
-                          putStrLn $ "Error, don't have a receive handler for topic: " ++ show topic ++ ", not in: " ++ show topics
+                        Nothing -> throwM (NoHandlerForTopic topic)
                         Just eff -> eff
 
-                , onClose = \_ _ -> do
-                    liftIO $ do
-                      putStrLn $ "Session " ++ show sessionID ++ " closed"
-                      -- kill TMapChan envSessionsOutgoing listener
-                      mListener <- atomically (tryTakeTMVar outgoingListener)
-                      case mListener of
-                        Nothing -> pure ()
-                        Just listener -> cancel listener
+              , onClose = \_ _ -> do
+                  liftIO $ do
+                    -- kill TMapChan envSessionsOutgoing listener
+                    mListener <- atomically (tryTakeTMVar outgoingListener)
+                    case mListener of
+                      Nothing -> pure ()
+                      Just listener -> cancel listener
 
+                    atomically $ do
                       unregisterSession env sessionID
-                      atomically $ do
-                        delSubscriberFromAllTopics env sessionID
-                      killAllOnOpenThreads env sessionID
+                      delSubscriberFromAllTopics env sessionID
 
-                    callAllOnUnsubscribe env sessionID
-                }
+                  callAllOnUnsubscribe env sessionID
+                  liftIO $ killAllOnOpenThreads env sessionID
+              }
 
-          (websocketsOrT runM defaultConnectionOptions (toServerAppT wsApp)) app req resp
+        wsApp' <- pingPong ((10^6) * 10) wsApp -- every 10 seconds
+
+        (websocketsOrT runM defaultConnectionOptions (toServerAppT wsApp')) app req resp
+
+    -- RESTful initIn -> initOut endpoints
+    RouterT (modify' (<> NR.Tries httpTrie mempty mempty))
+

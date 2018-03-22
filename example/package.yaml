@@ -37,6 +37,7 @@ executables:
     dependencies:
     - example
     - sparrow
+    - async
     - exceptions
     - extractable-singleton
     - http-types
