@@ -30,10 +30,9 @@ import Data.Aeson (FromJSON, ToJSON, Value)
 import qualified Data.Aeson as Aeson
 import Data.Singleton.Class (Extractable (runSingleton))
 import Data.UUID.V4 (nextRandom)
-import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Control.Monad (forever, void)
+import Control.Monad (forever)
 import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Control.Monad.Trans.Control.Aligned as Aligned
@@ -47,7 +46,7 @@ import Control.Concurrent.STM ( TMVar, TVar, TChan, atomically, newEmptyTMVarIO,
 import Control.Concurrent.STM.TMapMVar (newTMapMVar)
 import Control.DeepSeq (NFData (rnf))
 import Control.Exception (evaluate)
-import Path (Path, Abs, Rel, File, toFilePath, parseRelFile, (</>), parent, dirname, absdir)
+import Path (Abs, File, toFilePath, parseRelFile, (</>), parent, dirname, absdir)
 import Path.Extended (Location, fromPath, (<&>))
 import System.IO.Unsafe (unsafePerformIO)
 import Network.WebSockets (runClient)

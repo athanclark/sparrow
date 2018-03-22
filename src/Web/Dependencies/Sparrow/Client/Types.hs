@@ -14,15 +14,13 @@ module Web.Dependencies.Sparrow.Client.Types where
 import Web.Dependencies.Sparrow.Types (WSIncoming, WithTopic, Topic)
 
 import Data.Aeson (Value)
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HM
 import Control.Monad.Reader (ReaderT (..), MonadReader (..))
 import Control.Monad.Trans (MonadTrans (..))
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Writer (MonadWriter)
 import Control.Monad.State (MonadState)
 import Control.Monad.Catch (MonadCatch, MonadThrow, MonadMask, Exception)
-import Control.Concurrent.STM (STM, atomically, TVar, readTVar, modifyTVar')
+import Control.Concurrent.STM (STM, atomically)
 import Control.Concurrent.STM.TMapMVar (TMapMVar)
 import qualified Control.Concurrent.STM.TMapMVar as TMapMVar
 import GHC.Generics (Generic)

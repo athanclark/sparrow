@@ -1,5 +1,5 @@
 name:                sparrow
-version:             0.0.1
+version:             0.0.1.1
 git:                 "git://git.localcooking.com/tooling/sparrow.git"
 license:             BSD3
 author:              "Athan Clark"
