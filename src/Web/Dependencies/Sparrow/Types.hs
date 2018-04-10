@@ -3,6 +3,7 @@
   , GeneralizedNewtypeDeriving
   , OverloadedStrings
   , RecordWildCards
+  , NamedFieldPuns
   #-}
 
 module Web.Dependencies.Sparrow.Types where
@@ -51,6 +52,25 @@ type Server m initIn initOut deltaIn deltaOut =
   initIn -> m (Maybe (ServerContinue m initOut deltaIn deltaOut))
 
 
+staticServer :: Monad m
+             => (initIn -> m (Maybe initOut)) -- ^ Produce an initOut
+             -> Server m initIn initOut JSONVoid JSONVoid
+staticServer f initIn = do
+  mInitOut <- f initIn
+  case mInitOut of
+    Nothing -> pure Nothing
+    Just initOut -> pure $ Just ServerContinue
+      { serverOnUnsubscribe = pure ()
+      , serverContinue = \_ -> pure ServerReturn
+        { serverInitOut = initOut
+        , serverOnOpen = \ServerArgs{serverDeltaReject} -> do
+            serverDeltaReject
+            pure Nothing
+        , serverOnReceive = \_ _ -> pure ()
+        }
+      }
+
+
 
 -- ** Client
 
@@ -70,6 +90,23 @@ type Client m initIn initOut deltaIn deltaOut =
   ( ClientArgs m initIn initOut deltaIn deltaOut
     -> m (Maybe (ClientReturn m initOut deltaIn))
     ) -> m ()
+
+
+staticClient :: Monad m
+             => ((initIn -> m (Maybe initOut)) -> m ()) -- ^ Obtain an initOut
+             -> Client m initIn initOut JSONVoid JSONVoid
+staticClient f invoke = f $ \initIn -> do
+  mReturn <- invoke ClientArgs
+    { clientInitIn = initIn
+    , clientReceive = \_ _ -> pure ()
+    , clientOnReject = pure ()
+    }
+  case mReturn of
+    Nothing -> pure Nothing
+    Just ClientReturn{clientInitOut,clientUnsubscribe} -> do
+      clientUnsubscribe
+      pure (Just clientInitOut)
+
 
 
 -- ** Topic
@@ -97,6 +134,13 @@ type Broadcast m = Topic -> m (Maybe (Value -> Maybe (m ())))
 
 -- * JSON Encodings
 
+data JSONVoid
+
+instance ToJSON JSONVoid where
+  toJSON _ = String ""
+
+instance FromJSON JSONVoid where
+  parseJSON = typeMismatch "JSONVoid"
 
 
 data WithSessionID a = WithSessionID
