@@ -46,8 +46,8 @@ import Control.Concurrent.STM ( TMVar, TVar, TChan, atomically, newEmptyTMVarIO,
 import Control.Concurrent.STM.TMapMVar (newTMapMVar)
 import Control.DeepSeq (NFData (rnf))
 import Control.Exception (evaluate)
-import Path (Abs, File, toFilePath, parseRelFile, (</>), parent, dirname, absdir)
-import Path.Extended (Location, fromPath, (<&>))
+import Path (toFilePath, parseRelFile, (</>), parent, dirname, absdir)
+import Path.Extended (Location, fromAbsFile, (<&>), printLocation)
 import System.IO.Unsafe (unsafePerformIO)
 import Network.WebSockets (runClient)
 import Network.WebSockets.Trans (runClientAppT)
@@ -151,7 +151,7 @@ allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowCli
       httpURI :: Topic -> URI
       httpURI (Topic topic) =
         packLocation (Strict.Just (if tls then "https" else "http")) True auth $
-          fromPath $ path </> unsafePerformIO (parseRelFile $ T.unpack $ T.intercalate "/" topic)
+          fromAbsFile $ path </> unsafePerformIO (parseRelFile $ T.unpack $ T.intercalate "/" topic)
 
   sessionID <- SessionID <$> nextRandom
   let q = T.pack $ toFilePath $ dirname path
@@ -159,12 +159,12 @@ allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowCli
 
   let runWS :: WebSocketsApp m (WSOutgoing (WithTopic Value)) (WSIncoming (WithTopic Value)) -> IO ()
       runWS x = do
-        let loc :: Location Abs File
-            loc = fromPath (parent path </> file)
+        let loc :: Location
+            loc = fromAbsFile (parent path </> file)
                     <&> ("sessionID", Just (show sessionID))
 
-            f | tls = runSecureClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) (show loc)
-              | otherwise = runClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) (show loc)
+            f | tls = runSecureClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) $ T.unpack $ printLocation loc
+              | otherwise = runClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) $ T.unpack $ printLocation loc
 
         x' <- runM (pingPong ((10^6) * 10) x) -- every 10 seconds
         x'' <- runM (runClientAppT (toClientAppT x'))

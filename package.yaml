@@ -1,5 +1,5 @@
 name:                sparrow
-version:             0.0.1.3
+version:             0.0.1.4
 git:                 "git://git.localcooking.com/tooling/sparrow.git"
 license:             BSD3
 author:              "Athan Clark"
@@ -45,10 +45,10 @@ dependencies:
 - tmapmvar >= 0.0.4
 - transformers
 - unordered-containers
-- urlpath >= 8.0.1
+- urlpath >= 9.0.0
 - uuid
 - wai >= 0.12.4
-- wai-middleware-content-type >= 0.6.1.1
+- wai-middleware-content-type >= 0.6.1.2
 - wai-transformers >= 0.1.0
 - websockets >= 0.12.4.0
 - websockets-simple >= 0.1.2.1
