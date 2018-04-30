@@ -36,7 +36,7 @@ data ServerArgs m deltaOut = ServerArgs
 data ServerReturn m initOut deltaIn deltaOut = ServerReturn
   { serverInitOut   :: initOut
   , serverOnOpen    :: ServerArgs m deltaOut
-                    -> m (Maybe (Async ()))
+                    -> m [Async ()]
     -- ^ invoked once, and should return a 'Control.Concurrent.Async.link'ed long-lived thread
     -- to kill when the subscription dies
   , serverOnReceive :: ServerArgs m deltaOut
@@ -65,7 +65,7 @@ staticServer f initIn = do
         { serverInitOut = initOut
         , serverOnOpen = \ServerArgs{serverDeltaReject} -> do
             serverDeltaReject
-            pure Nothing
+            pure []
         , serverOnReceive = \_ _ -> pure ()
         }
       }

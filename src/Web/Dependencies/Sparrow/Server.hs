@@ -60,7 +60,7 @@ import Data.Monoid ((<>))
 import qualified Data.UUID as UUID
 import Data.Singleton.Class (Extractable (runSingleton))
 import Data.Proxy (Proxy (..))
-import Control.Monad (join, forever)
+import Control.Monad (join, forever, forM_)
 import Control.Monad.Trans (lift)
 import Control.Monad.State (modify')
 import Control.Monad.IO.Class (MonadIO (..))
@@ -159,13 +159,11 @@ unpackServer topic server = do
                   )
                 addSubscriber env topic withSessionIDSessionID
 
-              mThread <- serverOnOpen serverArgs
+              threads <- serverOnOpen serverArgs
 
-              case mThread of
-                Nothing -> pure ()
-                Just thread -> liftIO $ atomically $
-                  -- register onOpen thread
-                  registerOnOpenThread env withSessionIDSessionID topic thread
+              forM_ threads $ \thread -> liftIO $ atomically $
+                -- register onOpen thread
+                registerOnOpenThread env withSessionIDSessionID topic thread
 
               (NR.action $ NR.post $ \_ -> NR.json serverInitOut) app req resp
 

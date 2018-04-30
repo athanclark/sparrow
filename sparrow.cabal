@@ -2,10 +2,10 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bea32df81697724f58b7207f35f014d440a6c6add4f2801cd29fc9eb3a852eea
+-- hash: 3f9c3813672238ca87ee5934111feb5998231571a89777abeb7b399b653dce3c
 
 name:           sparrow
-version:        0.0.1.4
+version:        0.0.1.5
 synopsis:       Unified streaming dependency management for web apps
 description:    Please see the README on Github at <https://git.localcooking.com/tooling/sparrow#readme>
 category:       Web
@@ -59,7 +59,7 @@ library
     , mtl
     , nested-routes >=9.0.0.1
     , path
-    , path-extra >=0.0.6
+    , path-extra >=0.2.0
     , pred-trie >=0.6.0.1
     , stm
     , strict

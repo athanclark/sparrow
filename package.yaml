@@ -1,5 +1,5 @@
 name:                sparrow
-version:             0.0.1.4
+version:             0.0.1.5
 git:                 "git://git.localcooking.com/tooling/sparrow.git"
 license:             BSD3
 author:              "Athan Clark"
@@ -36,7 +36,7 @@ dependencies:
 - mtl
 - nested-routes >= 9.0.0.1
 - path
-- path-extra >= 0.0.6
+- path-extra >= 0.2.0
 - pred-trie >= 0.6.0.1
 - stm
 - strict
