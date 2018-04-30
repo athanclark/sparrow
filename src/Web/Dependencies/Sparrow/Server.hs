@@ -34,12 +34,12 @@ import Web.Dependencies.Sparrow.Server.Types
   , sendTo
   , unsafeRegisterReceive
   , registerOnUnsubscribe
-  , registerOnOpenThread
+  , registerOnOpenThreads
   , registerInvalidator
   , broadcaster
   , getCurrentRegisteredTopics
   , getCallReceive
-  , killOnOpenThread
+  , killOnOpenThreads
   , killAllOnOpenThreads
   , callOnUnsubscribe
   , callAllOnUnsubscribe
@@ -135,7 +135,7 @@ unpackServer topic server = do
                         delSubscriber env topic withSessionIDSessionID
 
                         sendTo env withSessionIDSessionID (WSTopicRejected topic)
-                      killOnOpenThread env withSessionIDSessionID topic
+                      killOnOpenThreads env withSessionIDSessionID topic
                     , serverSendCurrent =
                       liftIO . atomically . sendTo env withSessionIDSessionID . WSOutgoing . WithTopic topic . toJSON
                     }
@@ -161,9 +161,9 @@ unpackServer topic server = do
 
               threads <- serverOnOpen serverArgs
 
-              forM_ threads $ \thread -> liftIO $ atomically $
+              liftIO $ atomically $
                 -- register onOpen thread
-                registerOnOpenThread env withSessionIDSessionID topic thread
+                registerOnOpenThreads env withSessionIDSessionID topic threads
 
               (NR.action $ NR.post $ \_ -> NR.json serverInitOut) app req resp
 
@@ -250,7 +250,7 @@ serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
                       -- update client of removed subscription
                       send (WSTopicRemoved topic)
 
-                      liftIO $ killOnOpenThread env sessionID topic
+                      liftIO $ killOnOpenThreads env sessionID topic
 
                     WSIncoming (WithTopic topic x) -> do
                       mEff <- liftIO $ atomically $ getCallReceive env sessionID topic x

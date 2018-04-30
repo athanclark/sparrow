@@ -34,8 +34,8 @@ module Web.Dependencies.Sparrow.Server.Types
   , callOnUnsubscribe
   , callAllOnUnsubscribe
   , -- ** Thread Management
-    registerOnOpenThread
-  , killOnOpenThread
+    registerOnOpenThreads
+  , killOnOpenThreads
   , killAllOnOpenThreads
   , -- ** Bookkeeping
     unregisterReceive
@@ -203,18 +203,20 @@ callAllOnUnsubscribe Env{envRegisteredOnUnsubscribe} sID = do
         pure effs
   sequenceA_ effs
 
-type RegisteredOnOpenThreads =
-  TVar (HashMap SessionID (HashMap Topic (Async ())))
 
-registerOnOpenThread :: Env m -> SessionID -> Topic -> Async () -> STM ()
-registerOnOpenThread Env{envRegisteredOnOpenThreads} sID topic thread = do
+type RegisteredOnOpenThreads =
+  TVar (HashMap SessionID (HashMap Topic [Async ()]))
+
+
+registerOnOpenThreads :: Env m -> SessionID -> Topic -> [Async ()] -> STM ()
+registerOnOpenThreads Env{envRegisteredOnOpenThreads} sID topic thread = do
   xs <- readTVar envRegisteredOnOpenThreads
   let topics = fromMaybe HM.empty (HM.lookup sID xs)
   modifyTVar' envRegisteredOnOpenThreads
     (HM.insert sID (HM.insert topic thread topics))
 
-killOnOpenThread :: MonadIO m => Env m -> SessionID -> Topic -> IO ()
-killOnOpenThread Env{envRegisteredOnOpenThreads} sID topic = do
+killOnOpenThreads :: MonadIO m => Env m -> SessionID -> Topic -> IO ()
+killOnOpenThreads Env{envRegisteredOnOpenThreads} sID topic = do
   mThread <- atomically $ do
     xs <- readTVar envRegisteredOnOpenThreads
     case HM.lookup sID xs of
@@ -225,7 +227,7 @@ killOnOpenThread Env{envRegisteredOnOpenThreads} sID topic = do
         pure x
   case mThread of
     Nothing -> pure ()
-    Just thread -> cancel thread
+    Just threads -> mapM_ cancel threads
 
 
 killAllOnOpenThreads :: MonadIO m => Env m -> SessionID -> IO ()
@@ -238,7 +240,7 @@ killAllOnOpenThreads Env{envRegisteredOnOpenThreads} sID = do
         let x = HM.elems topics
         modifyTVar' envRegisteredOnOpenThreads (HM.delete sID)
         pure x
-  forM_ threads cancel
+  forM_ (concat threads) cancel
 
 
 data Env m = Env
