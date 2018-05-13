@@ -60,7 +60,9 @@ import Data.Monoid ((<>))
 import qualified Data.UUID as UUID
 import Data.Singleton.Class (Extractable (runSingleton))
 import Data.Proxy (Proxy (..))
-import Control.Monad (join, forever, forM_)
+import Data.Foldable (Foldable)
+import Control.Applicative (Alternative)
+import Control.Monad (join, forever)
 import Control.Monad.Trans (lift)
 import Control.Monad.State (modify')
 import Control.Monad.IO.Class (MonadIO (..))
@@ -85,7 +87,7 @@ import Network.HTTP.Types (status400)
 
 
 -- | Called per-connection
-unpackServer :: forall m stM http initIn initOut deltaIn deltaOut
+unpackServer :: forall m f stM http initIn initOut deltaIn deltaOut
               . MonadIO m
              => Aligned.MonadBaseControl IO m stM
              => Extractable stM
@@ -93,9 +95,10 @@ unpackServer :: forall m stM http initIn initOut deltaIn deltaOut
              => ToJSON initOut
              => FromJSON deltaIn
              => ToJSON deltaOut
+             => Foldable f
              => Topic -- ^ Name of Dependency
-             -> Server m initIn initOut deltaIn deltaOut -- ^ Handler for all clients
-             -> SparrowServerT http m (MiddlewareT m)
+             -> Server m f initIn initOut deltaIn deltaOut -- ^ Handler for all clients
+             -> SparrowServerT http f m (MiddlewareT m)
 unpackServer topic server = do
   env <- ask'
 
@@ -173,7 +176,7 @@ match :: Monad m
       => Match xs' xs childHttp resultHttp
       => UrlChunks xs -- ^ Should match the dependency name
       -> childHttp -- ^ 'Network.Wai.Trans.MiddlewareT', or a function to one
-      -> SparrowServerT resultHttp m ()
+      -> SparrowServerT resultHttp f m ()
 match ts http =
   tell' (singleton ts http)
 
@@ -188,8 +191,8 @@ type MatchGroup xs' xs childHttp resultHttp =
 matchGroup :: Monad m
            => MatchGroup xs' xs childHttp resultHttp
            => UrlChunks xs -- ^ Common 'Topic' prefix
-           -> SparrowServerT childHttp m () -- ^ Set of handlers
-           -> SparrowServerT resultHttp m ()
+           -> SparrowServerT childHttp f m () -- ^ Set of handlers
+           -> SparrowServerT resultHttp f m ()
 matchGroup ts x = do
   env <- ask'
   http <- lift (execSparrowServerT' env x)
@@ -197,13 +200,15 @@ matchGroup ts x = do
 
 
 -- | Host dependencies and websocket
-serveDependencies :: forall m stM sec a
+serveDependencies :: forall f m stM sec a
                    . MonadBaseControl IO m
                   => Aligned.MonadBaseControl IO m stM
                   => Extractable stM
                   => MonadIO m
                   => MonadCatch m
-                  => SparrowServerT (MiddlewareT m) m a -- ^ Dependencies
+                  => Foldable f
+                  => Alternative f
+                  => SparrowServerT (MiddlewareT m) f m a -- ^ Dependencies
                   -> m (RouterT (MiddlewareT m) sec m ())
 serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
   let runM :: forall b. m b -> IO b
@@ -232,7 +237,7 @@ serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
                     listener <- async $ forever $ do
                       x <- atomically (TMapChan.lookup envSessionsOutgoing sessionID)
                       runM (send x)
-                    atomically $ putTMVar outgoingListener listener
+                    atomically (putTMVar outgoingListener listener)
 
                   initSubs <- liftIO $ atomically $ getCurrentRegisteredTopics env sessionID
 
@@ -250,7 +255,7 @@ serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
                       -- update client of removed subscription
                       send (WSTopicRemoved topic)
 
-                      liftIO $ killOnOpenThreads env sessionID topic
+                      liftIO (killOnOpenThreads env sessionID topic)
 
                     WSIncoming (WithTopic topic x) -> do
                       mEff <- liftIO $ atomically $ getCallReceive env sessionID topic x
@@ -271,7 +276,7 @@ serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
                       delSubscriberFromAllTopics env sessionID
 
                   callAllOnUnsubscribe env sessionID
-                  liftIO $ killAllOnOpenThreads env sessionID
+                  liftIO (killAllOnOpenThreads env sessionID)
               }
 
         wsApp' <- pingPong ((10^6) * 10) wsApp -- every 10 seconds

@@ -18,9 +18,11 @@ import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), (.=), obj
 import Data.Aeson.Types (typeMismatch)
 import Data.Aeson.Attoparsec (attoAeson)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
-import Control.Applicative ((<|>))
+import Control.Applicative (Alternative (empty), (<|>))
 import Control.DeepSeq (NFData)
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Concurrent.Async (Async)
+import Control.Concurrent.STM (TVar, newTVarIO)
 import GHC.Generics (Generic)
 
 
@@ -33,28 +35,29 @@ data ServerArgs m deltaOut = ServerArgs
   , serverSendCurrent :: deltaOut -> m ()
   }
 
-data ServerReturn m initOut deltaIn deltaOut = ServerReturn
+data ServerReturn m f initOut deltaIn deltaOut = ServerReturn
   { serverInitOut   :: initOut
   , serverOnOpen    :: ServerArgs m deltaOut
-                    -> m [Async ()]
+                    -> m (TVar (f (Async ())))
     -- ^ invoked once, and should return a 'Control.Concurrent.Async.link'ed long-lived thread
     -- to kill when the subscription dies
   , serverOnReceive :: ServerArgs m deltaOut
                     -> deltaIn -> m () -- ^ invoked for each receive
   }
 
-data ServerContinue m initOut deltaIn deltaOut = ServerContinue
-  { serverContinue      :: Broadcast m -> m (ServerReturn m initOut deltaIn deltaOut)
+data ServerContinue m f initOut deltaIn deltaOut = ServerContinue
+  { serverContinue      :: Broadcast m -> m (ServerReturn m f initOut deltaIn deltaOut)
   , serverOnUnsubscribe :: m ()
   }
 
-type Server m initIn initOut deltaIn deltaOut =
-  initIn -> m (Maybe (ServerContinue m initOut deltaIn deltaOut))
+type Server m f initIn initOut deltaIn deltaOut =
+  initIn -> m (Maybe (ServerContinue m f initOut deltaIn deltaOut))
 
 
-staticServer :: Monad m
+staticServer :: MonadIO m
+             => Alternative f
              => (initIn -> m (Maybe initOut)) -- ^ Produce an initOut
-             -> Server m initIn initOut JSONVoid JSONVoid
+             -> Server m f initIn initOut JSONVoid JSONVoid
 staticServer f initIn = do
   mInitOut <- f initIn
   case mInitOut of
@@ -65,7 +68,8 @@ staticServer f initIn = do
         { serverInitOut = initOut
         , serverOnOpen = \ServerArgs{serverDeltaReject} -> do
             serverDeltaReject
-            pure []
+            threadVar <- liftIO (newTVarIO empty)
+            pure threadVar
         , serverOnReceive = \_ _ -> pure ()
         }
       }
