@@ -19,9 +19,11 @@ import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), (.=), obj
 import Data.Aeson.Types (typeMismatch)
 import Data.Aeson.Attoparsec (attoAeson)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
-import Control.Applicative ((<|>))
+import Control.Applicative (Alternative (empty), (<|>))
 import Control.DeepSeq (NFData)
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Concurrent.Async (Async)
+import Control.Concurrent.STM (TVar, newTVarIO)
 import GHC.Generics (Generic)
 
 
@@ -41,10 +43,10 @@ hoistServerArgs f ServerArgs{..} = ServerArgs
   }
 
 
-data ServerReturn m initOut deltaIn deltaOut = ServerReturn
+data ServerReturn m f initOut deltaIn deltaOut = ServerReturn
   { serverInitOut   :: initOut
   , serverOnOpen    :: ServerArgs m deltaOut
-                    -> m [Async ()]
+                    -> m (TVar (f (Async ())))
     -- ^ invoked once, and should return a 'Control.Concurrent.Async.link'ed long-lived thread
     -- to kill when the subscription dies
   , serverOnReceive :: ServerArgs m deltaOut
@@ -53,8 +55,8 @@ data ServerReturn m initOut deltaIn deltaOut = ServerReturn
 
 hoistServerReturn :: (forall a. m a -> n a)
                   -> (forall a. n a -> m a)
-                  -> ServerReturn m initOut deltaIn deltaOut
-                  -> ServerReturn n initOut deltaIn deltaOut
+                  -> ServerReturn m f initOut deltaIn deltaOut
+                  -> ServerReturn n f initOut deltaIn deltaOut
 hoistServerReturn f g ServerReturn{..} = ServerReturn
   { serverInitOut
   , serverOnOpen = \args -> f $ serverOnOpen $ hoistServerArgs g args
@@ -62,30 +64,30 @@ hoistServerReturn f g ServerReturn{..} = ServerReturn
   }
 
 
-data ServerContinue m initOut deltaIn deltaOut = ServerContinue
-  { serverContinue      :: Broadcast m -> m (ServerReturn m initOut deltaIn deltaOut)
+data ServerContinue m f initOut deltaIn deltaOut = ServerContinue
+  { serverContinue      :: Broadcast m -> m (ServerReturn m f initOut deltaIn deltaOut)
   , serverOnUnsubscribe :: m ()
   }
 
 hoistServerContinue :: Monad m
                     => (forall a. m a -> n a)
                     -> (forall a. n a -> m a)
-                    -> ServerContinue m initOut deltaIn deltaOut
-                    -> ServerContinue n initOut deltaIn deltaOut
+                    -> ServerContinue m f initOut deltaIn deltaOut
+                    -> ServerContinue n f initOut deltaIn deltaOut
 hoistServerContinue f g ServerContinue{..} = ServerContinue
   { serverContinue = \bcast -> f $ hoistServerReturn f g <$> serverContinue (hoistBroadcast g bcast)
   , serverOnUnsubscribe = f serverOnUnsubscribe
   }
 
 
-type Server m initIn initOut deltaIn deltaOut =
-  initIn -> m (Maybe (ServerContinue m initOut deltaIn deltaOut))
+type Server m f initIn initOut deltaIn deltaOut =
+  initIn -> m (Maybe (ServerContinue m f initOut deltaIn deltaOut))
 
 hoistServer :: Monad m => Monad n
             => (forall a. m a -> n a)
             -> (forall a. n a -> m a)
-            -> Server m initIn initOut deltaIn deltaOut
-            -> Server n initIn initOut deltaIn deltaOut
+            -> Server m f initIn initOut deltaIn deltaOut
+            -> Server n f initIn initOut deltaIn deltaOut
 hoistServer f g server = \initIn -> do
   mCont <- f $ server initIn
   case mCont of
@@ -94,9 +96,10 @@ hoistServer f g server = \initIn -> do
 
 
 
-staticServer :: Monad m
+staticServer :: MonadIO m
+             => Alternative f
              => (initIn -> m (Maybe initOut)) -- ^ Produce an initOut
-             -> Server m initIn initOut JSONVoid JSONVoid
+             -> Server m f initIn initOut JSONVoid JSONVoid
 staticServer f initIn = do
   mInitOut <- f initIn
   case mInitOut of
@@ -107,7 +110,8 @@ staticServer f initIn = do
         { serverInitOut = initOut
         , serverOnOpen = \ServerArgs{serverDeltaReject} -> do
             serverDeltaReject
-            pure []
+            threadVar <- liftIO (newTVarIO empty)
+            pure threadVar
         , serverOnReceive = \_ _ -> pure ()
         }
       }

@@ -166,7 +166,7 @@ allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowCli
             f | tls = runSecureClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) $ T.unpack $ printLocation loc
               | otherwise = runClient (T.unpack $ printURIAuthHost host) (Strict.maybe 80 fromIntegral port) $ T.unpack $ printLocation loc
 
-        x' <- runM (pingPong ((10^6) * 10) x) -- every 10 seconds
+        x' <- runM (pingPong ((10^(6 :: Int)) * 10) x) -- every 10 seconds
         x'' <- runM (runClientAppT (toClientAppT x'))
         f x''
 
@@ -268,6 +268,6 @@ allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowCli
 
   --   Start clients
   z <- runM (runReaderT runSparrowClientT env)
-  evaluate z
+  _ <- evaluate z
 
   wait ws
