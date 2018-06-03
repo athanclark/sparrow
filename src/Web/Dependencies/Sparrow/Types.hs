@@ -4,6 +4,7 @@
   , OverloadedStrings
   , RecordWildCards
   , NamedFieldPuns
+  , RankNTypes
   #-}
 
 module Web.Dependencies.Sparrow.Types where
@@ -33,6 +34,13 @@ data ServerArgs m deltaOut = ServerArgs
   , serverSendCurrent :: deltaOut -> m ()
   }
 
+hoistServerArgs :: (forall a. m a -> n a) -> ServerArgs m deltaOut -> ServerArgs n deltaOut
+hoistServerArgs f ServerArgs{..} = ServerArgs
+  { serverDeltaReject = f serverDeltaReject
+  , serverSendCurrent = f . serverSendCurrent
+  }
+
+
 data ServerReturn m initOut deltaIn deltaOut = ServerReturn
   { serverInitOut   :: initOut
   , serverOnOpen    :: ServerArgs m deltaOut
@@ -43,13 +51,47 @@ data ServerReturn m initOut deltaIn deltaOut = ServerReturn
                     -> deltaIn -> m () -- ^ invoked for each receive
   }
 
+hoistServerReturn :: (forall a. m a -> n a)
+                  -> (forall a. n a -> m a)
+                  -> ServerReturn m initOut deltaIn deltaOut
+                  -> ServerReturn n initOut deltaIn deltaOut
+hoistServerReturn f g ServerReturn{..} = ServerReturn
+  { serverInitOut
+  , serverOnOpen = \args -> f $ serverOnOpen $ hoistServerArgs g args
+  , serverOnReceive = \args deltaIn -> f $ serverOnReceive (hoistServerArgs g args) deltaIn
+  }
+
+
 data ServerContinue m initOut deltaIn deltaOut = ServerContinue
   { serverContinue      :: Broadcast m -> m (ServerReturn m initOut deltaIn deltaOut)
   , serverOnUnsubscribe :: m ()
   }
 
+hoistServerContinue :: Monad m
+                    => (forall a. m a -> n a)
+                    -> (forall a. n a -> m a)
+                    -> ServerContinue m initOut deltaIn deltaOut
+                    -> ServerContinue n initOut deltaIn deltaOut
+hoistServerContinue f g ServerContinue{..} = ServerContinue
+  { serverContinue = \bcast -> f $ hoistServerReturn f g <$> serverContinue (hoistBroadcast g bcast)
+  , serverOnUnsubscribe = f serverOnUnsubscribe
+  }
+
+
 type Server m initIn initOut deltaIn deltaOut =
   initIn -> m (Maybe (ServerContinue m initOut deltaIn deltaOut))
+
+hoistServer :: Monad m => Monad n
+            => (forall a. m a -> n a)
+            -> (forall a. n a -> m a)
+            -> Server m initIn initOut deltaIn deltaOut
+            -> Server n initIn initOut deltaIn deltaOut
+hoistServer f g server = \initIn -> do
+  mCont <- f $ server initIn
+  case mCont of
+    Nothing -> pure Nothing
+    Just cont -> pure $ Just $ hoistServerContinue f g cont
+
 
 
 staticServer :: Monad m
@@ -130,6 +172,14 @@ instance ToJSON Topic where
 -- ** Broadcast
 
 type Broadcast m = Topic -> m (Maybe (Value -> Maybe (m ())))
+
+hoistBroadcast :: Monad n => (forall a. m a -> n a) -> Broadcast m -> Broadcast n
+hoistBroadcast f bcast = \topic -> do
+  mResolve <- f (bcast topic)
+  case mResolve of
+    Nothing -> pure Nothing
+    Just resolve -> pure $ Just $ \v -> f <$> resolve v
+
 
 
 -- * JSON Encodings
