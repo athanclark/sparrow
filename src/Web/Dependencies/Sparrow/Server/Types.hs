@@ -87,7 +87,7 @@ sendTo Env{envSessionsOutgoing} =
   TMapChan.insert envSessionsOutgoing
 
 
-type RegisteredReceive m = -- STMMap.Map SessionID (STMMap.Map Topic (Value -> Maybe (m ())))
+type RegisteredReceive m =
   TMapMVar SessionID (TMapMVar Topic (Value -> Maybe (m ())))
 
 
@@ -101,8 +101,6 @@ unsafeRegisterReceive Env{envRegisteredReceive} sID topic f = do
       topics <- newTMapMVar
       TMapMVar.insert topics topic f
       TMapMVar.insert envRegisteredReceive sID topics
-      -- ks <- getCurrentRegisteredTopics env sID
-      -- putStrLn $ " - unsafeRegisterReceive: Topics...: " ++ show ks
     Just topics ->
       TMapMVar.insertForce topics topic f
 
