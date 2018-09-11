@@ -13,12 +13,14 @@ import Web.Dependencies.Sparrow.Session (SessionID)
 
 import Data.Hashable (Hashable)
 import Data.Text (Text, intercalate, unpack)
+import qualified Data.Text as T
 import qualified Data.Text.Lazy.Encoding as LT
 import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), (.=), object, (.:))
 import Data.Aeson.Types (typeMismatch)
 import Data.Aeson.Attoparsec (attoAeson)
 import Data.Aeson.JSONVoid (JSONVoid)
+import Data.String (IsString (..))
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
 import Control.Applicative (Alternative (empty), (<|>))
 import Control.DeepSeq (NFData)
@@ -37,7 +39,9 @@ data ServerArgs m deltaOut = ServerArgs
   , serverSendCurrent :: deltaOut -> m ()
   }
 
-hoistServerArgs :: (forall a. m a -> n a) -> ServerArgs m deltaOut -> ServerArgs n deltaOut
+hoistServerArgs :: (forall a. m a -> n a)
+                -> ServerArgs m deltaOut
+                -> ServerArgs n deltaOut
 hoistServerArgs f ServerArgs{..} = ServerArgs
   { serverDeltaReject = f serverDeltaReject
   , serverSendCurrent = f . serverSendCurrent
@@ -160,6 +164,14 @@ staticClient f invoke = f $ \initIn -> do
 
 newtype Topic = Topic {getTopic :: [Text]}
   deriving (Eq, Ord, Generic, Hashable, NFData)
+
+instance IsString Topic where
+  fromString x' =
+    let loop x = case T.breakOn "/" x of
+          (l,r)
+            | r == "" -> []
+            | otherwise -> l : loop (T.drop 1 r)
+    in  Topic $ loop $ T.pack x'
 
 instance Show Topic where
   show (Topic x) = unpack (intercalate "/" x)
