@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ca194da829dc469ef7c296f3c390fa1b36df83bd6bff4eee9cab731849fe886e
+-- hash: 480f8b5ab6cf29c0c6f4479def8eea05566360a97d7dce34a14dfefbea1efea0
 
 name:           sparrow
 version:        0.0.2.1
@@ -43,7 +43,7 @@ library
     , aeson-attoparsec
     , async
     , attoparsec
-    , attoparsec-uri >=0.0.4
+    , attoparsec-uri >=0.0.5.1
     , base >=4.7 && <5
     , bytestring
     , deepseq
@@ -61,6 +61,7 @@ library
     , path
     , path-extra >=0.2.0
     , pred-trie >=0.6.0.1
+    , purescript-iso >=0.0.3
     , stm
     , strict
     , text
@@ -68,7 +69,7 @@ library
     , tmapmvar >=0.0.4
     , transformers
     , unordered-containers
-    , urlpath >=9.0.0
+    , urlpath >=9.0.0.1
     , uuid
     , wai >=0.12.4
     , wai-middleware-content-type >=0.6.1.2

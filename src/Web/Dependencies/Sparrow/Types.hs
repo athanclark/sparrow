@@ -18,6 +18,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), (.=), object, (.:))
 import Data.Aeson.Types (typeMismatch)
 import Data.Aeson.Attoparsec (attoAeson)
+import Data.Aeson.JSONVoid (JSONVoid)
 import Data.Attoparsec.Text (Parser, takeWhile1, char, sepBy)
 import Control.Applicative (Alternative (empty), (<|>))
 import Control.DeepSeq (NFData)
@@ -187,14 +188,6 @@ hoistBroadcast f bcast = \topic -> do
 
 
 -- * JSON Encodings
-
-data JSONVoid
-
-instance ToJSON JSONVoid where
-  toJSON _ = String ""
-
-instance FromJSON JSONVoid where
-  parseJSON = typeMismatch "JSONVoid"
 
 
 data WithSessionID a = WithSessionID

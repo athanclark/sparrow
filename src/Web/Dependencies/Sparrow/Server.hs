@@ -121,6 +121,7 @@ unpackServer topic server = do
           -- ##  invoke Server
           mContinue <- server initIn
           case mContinue of
+            -- FIXME There's got to be some kind of error type
             Nothing -> resp (jsonOnly (InitRejected :: InitResponse ()) status400 [])
             Just ServerContinue{serverContinue,serverOnUnsubscribe} -> do
 

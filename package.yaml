@@ -21,7 +21,7 @@ dependencies:
 - aeson-attoparsec
 - async
 - attoparsec
-- attoparsec-uri >= 0.0.4
+- attoparsec-uri >= 0.0.5.1
 - bytestring
 - deepseq
 - exceptions
@@ -38,6 +38,7 @@ dependencies:
 - path
 - path-extra >= 0.2.0
 - pred-trie >= 0.6.0.1
+- purescript-iso >= 0.0.3
 - stm
 - strict
 - text
@@ -45,7 +46,7 @@ dependencies:
 - tmapmvar >= 0.0.4
 - transformers
 - unordered-containers
-- urlpath >= 9.0.0
+- urlpath >= 9.0.0.1
 - uuid
 - wai >= 0.12.4
 - wai-middleware-content-type >= 0.6.1.2
