@@ -1,5 +1,5 @@
 name:                sparrow
-version:             0.0.2.2
+version:             0.0.3
 github:              "athanclark/sparrow"
 license:             BSD3
 author:              "Athan Clark"
@@ -16,12 +16,12 @@ extra-source-files:
 description:         Please see the README on Github at <https://git.localcooking.com/tooling/sparrow#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+- base >= 4.11 && < 5
 - aeson
 - aeson-attoparsec
 - async
 - attoparsec
-- attoparsec-uri >= 0.0.5.1
+- attoparsec-uri >= 0.0.7
 - bytestring
 - deepseq
 - exceptions
@@ -34,11 +34,11 @@ dependencies:
 - monad-control
 - monad-control-aligned
 - mtl
-- nested-routes >= 9.0.0.1
+- nested-routes >= 9.0.2
 - path
 - path-extra >= 0.2.0
-- pred-trie >= 0.6.0.1
-- purescript-iso >= 0.0.3
+- pred-trie >= 0.6.1
+- purescript-iso >= 0.0.5
 - stm
 - strict
 - text
@@ -46,13 +46,13 @@ dependencies:
 - tmapmvar >= 0.0.4
 - transformers
 - unordered-containers
-- urlpath >= 9.0.0.1
+- urlpath >= 9.0.1
 - uuid
 - wai >= 0.12.4
-- wai-middleware-content-type >= 0.6.1.2
+- wai-middleware-content-type >= 0.6.2
 - wai-transformers >= 0.1.0
 - websockets >= 0.12.4.0
-- websockets-simple >= 0.1.2.1
+- websockets-simple >= 0.1.3
 - wuss
 
 library:
