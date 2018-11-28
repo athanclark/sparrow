@@ -2,13 +2,15 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6c306d5812574925b3eb6f92b35d603c4976930dc2a6570a95411888cf3a4523
+-- hash: 23955c18c98f9a7e9c793381042a3866f8c499f346dbaa62576d9f2bc72bf545
 
 name:           sparrow
-version:        0.0.2.2
-synopsis:       Unified streaming dependency management for web apps
+version:        0.0.3
+synopsis:       Unified streaming data-dependency framework for web apps
 description:    Please see the README on Github at <https://git.localcooking.com/tooling/sparrow#readme>
 category:       Web
+homepage:       https://github.com/athanclark/sparrow#readme
+bug-reports:    https://github.com/athanclark/sparrow/issues
 author:         Athan Clark
 maintainer:     athan.clark@localcooking.com
 copyright:      2018 Local Cooking Inc.
@@ -22,7 +24,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: git://git.localcooking.com/tooling/sparrow.git
+  location: https://github.com/athanclark/sparrow
 
 library
   exposed-modules:
@@ -43,7 +45,7 @@ library
     , aeson-attoparsec
     , async
     , attoparsec
-    , attoparsec-uri >=0.0.5.1
+    , attoparsec-uri >=0.0.7
     , base >=4.7 && <5
     , bytestring
     , deepseq
@@ -57,11 +59,11 @@ library
     , monad-control
     , monad-control-aligned
     , mtl
-    , nested-routes >=9.0.0.1
+    , nested-routes >=9.0.2
     , path
     , path-extra >=0.2.0
-    , pred-trie >=0.6.0.1
-    , purescript-iso >=0.0.3
+    , pred-trie >=0.6.1
+    , purescript-iso >=0.0.5
     , stm
     , strict
     , text
@@ -69,12 +71,12 @@ library
     , tmapmvar >=0.0.4
     , transformers
     , unordered-containers
-    , urlpath >=9.0.0.1
+    , urlpath >=9.0.1
     , uuid
     , wai >=0.12.4
-    , wai-middleware-content-type >=0.6.1.2
+    , wai-middleware-content-type >=0.6.2
     , wai-transformers >=0.1.0
     , websockets >=0.12.4.0
-    , websockets-simple >=0.1.2.1
+    , websockets-simple >=0.1.3
     , wuss
   default-language: Haskell2010
