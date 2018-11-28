@@ -10,10 +10,9 @@
 module Web.Dependencies.Sparrow.Client where
 
 import Web.Dependencies.Sparrow.Types
-  ( Client, ClientArgs (..), ClientReturn (..)
-  , Topic (..), WSIncoming (..), WSOutgoing (..), WithTopic (..), WithSessionID (..)
+  ( Client, ClientArgs (..), ClientReturn (..), newSessionID
+  , Topic, topicToRelFile, WSIncoming (..), WSOutgoing (..), WithTopic (..), WithSessionID (..)
   )
-import Web.Dependencies.Sparrow.Session (SessionID (..))
 import Web.Dependencies.Sparrow.Client.Types
   ( SparrowClientT (..), Env (..), ask', RegisteredTopicSubscriptions
   , callReject, callOnReceive, registerSubscription, removeSubscription
@@ -29,7 +28,6 @@ import qualified Data.Strict.Maybe as Strict
 import Data.Aeson (FromJSON, ToJSON, Value)
 import qualified Data.Aeson as Aeson
 import Data.Singleton.Class (Extractable (runSingleton))
-import Data.UUID.V4 (nextRandom)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Control.Monad (forever)
@@ -48,7 +46,6 @@ import Control.DeepSeq (NFData (rnf))
 import Control.Exception (evaluate)
 import Path (toFilePath, parseRelFile, (</>), parent, dirname, absdir)
 import Path.Extended (Location, fromAbsFile, (<&>), printLocation)
-import System.IO.Unsafe (unsafePerformIO)
 import Network.WebSockets (runClient)
 import Network.WebSockets.Trans (runClientAppT)
 import Network.WebSockets.Simple (WebSocketsApp (..), WebSocketsAppParams (..), toClientAppT, expBackoffStrategy)
@@ -59,6 +56,7 @@ import Network.HTTP.Types (status200)
 import Wuss (runSecureClient)
 
 
+-- | Adds a client for a particular topic to the builder
 unpackClient :: forall m stM initIn initOut deltaIn deltaOut
               . MonadIO m
              => MonadThrow m
@@ -132,6 +130,7 @@ unpackClient topic client = do
     atomically (putTMVar threadVar thread)
 
 
+-- | Runs the client builder
 allocateDependencies :: forall m stM a
                       . MonadIO m
                      => MonadBaseControl IO m
@@ -149,11 +148,11 @@ allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowCli
       runM x = runSingleton <$> runInBase x
 
       httpURI :: Topic -> URI
-      httpURI (Topic topic) =
+      httpURI topic =
         packLocation (Strict.Just (if tls then "https" else "http")) True auth $
-          fromAbsFile $ path </> unsafePerformIO (parseRelFile $ T.unpack $ T.intercalate "/" topic)
+          fromAbsFile $ path </> topicToRelFile topic
 
-  sessionID <- SessionID <$> nextRandom
+  sessionID <- newSessionID
   let q = T.pack $ toFilePath $ dirname path
   file <- parseRelFile $ T.unpack $ T.take (T.length q - 1) q
 
@@ -257,7 +256,6 @@ allocateDependencies tls auth@(URIAuth _ host port) SparrowClientT{runSparrowCli
                 then atomically $ modifyTVar' pendingTopicsRemoved (HS.delete topic)
                 else throwM (UnexpectedRemovedTopic topic)
           WSTopicRejected topic -> callReject env topic
-          WSDecodingError err -> throwM (NetworkingDecodingError err)
           WSOutgoing (WithTopic topic v) -> callOnReceive env topic v
       , onClose = \_ e ->
           liftIO $ do

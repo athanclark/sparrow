@@ -1,8 +1,10 @@
--- This file has been generated from package.yaml by hpack version 0.21.2.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 368782993f635b936013c644e6a965dd2bfd3a4320f83ef300c816c0fd3a8c58
+-- hash: 6edfb24562ad73aa3e68e8515d4077a095634d8f053d391be61e857bf5d79919
 
 name:           sparrow
 version:        0.0.3.1
@@ -17,8 +19,6 @@ copyright:      2018 Local Cooking Inc.
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-cabal-version:  >= 1.10
-
 extra-source-files:
     README.md
 
@@ -33,7 +33,6 @@ library
       Web.Dependencies.Sparrow.Client.Types
       Web.Dependencies.Sparrow.Server
       Web.Dependencies.Sparrow.Server.Types
-      Web.Dependencies.Sparrow.Session
       Web.Dependencies.Sparrow.Types
   other-modules:
       Paths_sparrow

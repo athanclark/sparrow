@@ -15,23 +15,23 @@ import Web.Dependencies.Sparrow.Types
   , ServerArgs (..)
   , ServerReturn (..)
   , ServerContinue (..)
-  , Topic (..)
+  , Topic
   , WithSessionID (..)
   , WithTopic (..)
   , InitResponse (..)
   , WSHTTPResponse (..)
   , WSIncoming (..)
   , WSOutgoing (..)
+  , sessionIDFromQueryString
   )
-import Web.Dependencies.Sparrow.Session (SessionID (..))
 import Web.Dependencies.Sparrow.Server.Types
   ( SparrowServerT
-  , Env (..)
   , ask'
   , tell'
   , execSparrowServerT
   , execSparrowServerT'
   , sendTo
+  , getSent
   , unsafeRegisterReceive
   , registerOnUnsubscribe
   , registerOnOpenThreads
@@ -57,12 +57,11 @@ import Data.Aeson (FromJSON, ToJSON (toJSON), Value)
 import qualified Data.Aeson as Aeson
 import Data.Trie.Pred.Interface.Types (Singleton (singleton), Extrude (extrude))
 import Data.Monoid ((<>))
-import qualified Data.UUID as UUID
 import Data.Singleton.Class (Extractable (runSingleton))
 import Data.Proxy (Proxy (..))
 import Data.Foldable (Foldable)
 import Control.Applicative (Alternative)
-import Control.Monad (join, forever)
+import Control.Monad (forever)
 import Control.Monad.Trans (lift)
 import Control.Monad.State (modify')
 import Control.Monad.IO.Class (MonadIO (..))
@@ -71,10 +70,9 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Control.Monad.Trans.Control.Aligned as Aligned
 import Control.Concurrent.Async (Async, async, cancel)
 import Control.Concurrent.STM (TMVar, atomically, newEmptyTMVarIO, tryTakeTMVar, putTMVar)
-import qualified Control.Concurrent.STM.TMapChan.Hash as TMapChan
 import Control.Exception (evaluate)
 import Control.DeepSeq (NFData (rnf))
-import Network.Wai (strictRequestBody, queryString)
+import Network.Wai (strictRequestBody)
 import Network.Wai.Trans (MiddlewareT)
 import Network.Wai.Middleware.ContentType.Json (jsonOnly)
 import Network.WebSockets (defaultConnectionOptions)
@@ -215,18 +213,15 @@ serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
   let runM :: forall b. m b -> IO b
       runM x = runSingleton <$> runInBase x
 
-  (httpTrie,env@Env{envSessionsOutgoing}) <- runM (execSparrowServerT server)
+  (httpTrie,env) <- runM (execSparrowServerT server)
 
   evaluate (rnf httpTrie)
 
   pure $ NR.matchGroup (NR.l_ "dependencies" NR.</> NR.o_) $ do
     -- websocket
-    NR.matchHere $ \app req resp -> case join (lookup "sessionID" (queryString req))
-                                          >>= UUID.fromASCIIBytes of
+    NR.matchHere $ \app req resp -> case sessionIDFromQueryString req of
       Nothing -> resp (jsonOnly NoSessionID status400 [])
-      Just sID -> do
-        let sessionID = SessionID sID
-
+      Just sessionID -> do
         -- For listening on the outgoing TMapChan envSessionsOutgoing
         (outgoingListener :: TMVar (Async ())) <- liftIO newEmptyTMVarIO
 
@@ -236,7 +231,7 @@ serveDependencies server = Aligned.liftBaseWith $ \runInBase -> do
                   liftIO $ do
                     -- spawn and store TMapChan envSessionsOutgoing listener
                     listener <- async $ forever $ do
-                      x <- atomically (TMapChan.lookup envSessionsOutgoing sessionID)
+                      x <- atomically (getSent env sessionID)
                       runM (send x)
                     atomically (putTMVar outgoingListener listener)
 
