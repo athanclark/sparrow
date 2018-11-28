@@ -36,7 +36,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - example
-    - sparrow
+    - sparrow >= 0.0.3
     - async
     - exceptions
     - extractable-singleton
@@ -44,7 +44,8 @@ executables:
     - monad-control
     - monad-control-aligned
     - mtl
-    - nested-routes >= 9.0.0.1
+    - nested-routes >= 9.0.2
+    - stm
     - wai-transformers
     - wai-middleware-content-type
     - wai

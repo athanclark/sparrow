@@ -41,12 +41,11 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - attoparsec-uri-0.0.7
-- nested-routes-9.0.1.1
+- nested-routes-9.0.2
 - pred-trie-0.6.1
 - purescript-iso-0.0.5
 - urlpath-9.0.1
 - wai-middleware-content-type-0.6.2
-- websockets-simple-0.1.2.1
 - attoparsec-ip-0.0.5
 - emailaddress-0.2.0.0
 - ip-1.4.1
@@ -58,6 +57,7 @@ extra-deps:
 - rose-trees-0.0.4.4
 - sets-0.0.6
 - commutative-0.0.2
+- websockets-simple-0.1.3
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

@@ -28,12 +28,13 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Control.Monad.Trans.Control.Aligned as Aligned
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, link)
+import Control.Concurrent.STM (newTVarIO)
 
 
 server :: MonadIO m
        => Aligned.MonadBaseControl IO m stM
        => Extractable stM
-       => Server m InitIn InitOut DeltaIn DeltaOut
+       => Server m [] InitIn InitOut DeltaIn DeltaOut
 server InitIn = do
   liftIO $ putStrLn "  ## Init"
   pure $ Just ServerContinue
@@ -48,7 +49,8 @@ server InitIn = do
                   putStrLn "  ## Sending DeltaOut onOpen"
                   runM (serverSendCurrent DeltaOut)
                   threadDelay $ (10^6) * 2
-                pure (Just thread)
+                threadVar <- newTVarIO [thread]
+                pure threadVar
           , serverOnReceive = \ServerArgs{serverDeltaReject,serverSendCurrent} DeltaIn -> do
               liftIO $ putStrLn "  ## Received DeltaIn and Rejecting"
               -- serverDeltaReject
