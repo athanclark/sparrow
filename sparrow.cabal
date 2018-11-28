@@ -2,10 +2,10 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 23955c18c98f9a7e9c793381042a3866f8c499f346dbaa62576d9f2bc72bf545
+-- hash: 368782993f635b936013c644e6a965dd2bfd3a4320f83ef300c816c0fd3a8c58
 
 name:           sparrow
-version:        0.0.3
+version:        0.0.3.1
 synopsis:       Unified streaming data-dependency framework for web apps
 description:    Please see the README on Github at <https://git.localcooking.com/tooling/sparrow#readme>
 category:       Web
